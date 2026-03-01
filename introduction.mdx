@@ -1,0 +1,66 @@
+---
+title: Introduction
+description: Laravel XML is a powerful package for importing and exporting XML data in your Laravel application with support for casting, transforming, and optimizing XML structures.
+---
+
+## What is Laravel XML?
+
+Laravel XML is a comprehensive package that simplifies working with XML data in your Laravel applications. Whether you need to import XML from external APIs, export data to XML format, or transform XML structures into Laravel models, this package provides an intuitive fluent API to get the job done.
+
+## Key features
+
+Laravel XML offers powerful features to handle all your XML processing needs:
+
+**Fast XML importing**
+
+Import XML files from local paths or remote URLs with a simple, chainable API. The package handles parsing and provides immediate access to your XML data as native PHP objects.
+
+**Automatic casting**
+
+Cast XML elements directly to Eloquent models, custom classes, or any object that implements the `Castable` interface. Perfect for mapping API responses to your application's domain objects.
+
+**Flexible transforming**
+
+Transform XML data on-the-fly using built-in transformers or create custom transformers to filter, modify, or restructure your XML data before using it.
+
+**Multiple export formats**
+
+Export data to XML from PHP arrays or render Laravel views as XML. Configure encoding, versioning, root tags, and formatting to match any XML schema requirement.
+
+**Key optimization**
+
+Automatically convert XML element names to `snake_case` or `camelCase` to match your application's coding conventions.
+
+## Get started
+
+Ready to start working with XML in Laravel? Choose your path:
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the package via Composer and configure your Laravel application
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Learn the basics with a complete working example of importing and exporting XML
+  </Card>
+</CardGroup>
+
+## How it works
+
+Laravel XML provides a facade that you can use throughout your application:
+
+```php
+use XML;
+
+// Import XML and cast to models
+$notes = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->optimize('camelcase')
+    ->get();
+
+// Export arrays to XML
+XML::export($data)
+    ->rootTag('notes')
+    ->toString();
+```
+
+The package integrates seamlessly with Laravel's service container and supports auto-discovery, so you can start using it immediately after installation.

@@ -1,0 +1,169 @@
+---
+title: Importing XML files
+description: Learn how to import and parse XML files from local paths and URLs
+---
+
+The Laravel XML package makes it easy to import XML files from local paths or remote URLs. The `XML::import()` method returns an `XMLCollection` that provides a fluent interface for accessing and manipulating your XML data.
+
+## Basic importing
+
+Import an XML file using the `XML::import()` method by providing a file path or URL:
+
+```php
+use Flowgistics\XML\XML;
+
+$notes = XML::import('notes.xml')->get();
+```
+
+The `import()` method accepts two parameters:
+
+- `$path` (string) - The path to the XML file or a URL
+- `$raw` (bool, optional) - Set to `true` to return raw XML data without processing
+
+### Import from URL
+
+You can import XML from remote URLs just as easily:
+
+```php
+$data = XML::import('https://example.com/feed.xml')->get();
+```
+
+## Accessing XML data
+
+Once imported, you can access XML elements using object notation:
+
+```php
+$xml = XML::import('notes.xml')->get();
+
+// Access elements
+$to = $xml->note->to;
+$from = $xml->note->from;
+$heading = $xml->note->heading;
+```
+
+### Working with attributes
+
+Access XML element attributes using the `attribute()` method:
+
+```php
+$xml = XML::import('notes.xml')->get();
+
+// Get attribute value
+$count = $xml->attribute('count');
+
+// Get attribute with default value
+$status = $xml->note->attribute('completed', false);
+```
+
+Check if an attribute exists:
+
+```php
+if ($xml->note->hasAttribute('completed')) {
+    // Attribute exists
+}
+```
+
+## Raw XML import
+
+If you need to work with the raw `XMLElement` object instead of the processed `XMLCollection`, set the second parameter to `true`:
+
+```php
+$rawXml = XML::import('notes.xml', true);
+
+// Or use the raw() method
+$xml = XML::import('notes.xml')->raw();
+```
+
+## Working with collections
+
+The imported XML can be converted to a Laravel Collection for advanced manipulation:
+
+```php
+$collection = XML::import('notes.xml')->collect();
+
+// Use Laravel Collection methods
+$filtered = $collection->filter(function ($item) {
+    return $item->completed === 'true';
+});
+```
+
+## Array access
+
+The `XMLCollection` implements `ArrayAccess`, allowing you to use array syntax:
+
+```php
+$xml = XML::import('notes.xml')->get();
+
+// Array access
+$note = $xml['note'];
+
+// Check if key exists
+if (isset($xml['note'])) {
+    // Note element exists
+}
+
+// Count elements
+$count = count($xml);
+```
+
+## Converting to array or JSON
+
+Convert your XML data to arrays or JSON:
+
+```php
+$xml = XML::import('notes.xml')->get();
+
+// Convert to array
+$array = $xml->toArray();
+
+// Convert to JSON
+$json = $xml->toJson();
+```
+
+## Method chaining
+
+All XML operations can be chained together for a fluent interface:
+
+```php
+$notes = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->expect('note')->as('array')
+    ->optimize('camelcase')
+    ->get();
+```
+
+<Note>
+The `import()` method automatically detects whether the path is a URL or local file path. Make sure the file exists or the URL is accessible to avoid exceptions.
+</Note>
+
+## Error handling
+
+Wrap your import calls in try-catch blocks to handle potential errors:
+
+```php
+use Flowgistics\XML\XML;
+
+try {
+    $xml = XML::import('notes.xml')->get();
+} catch (\Exception $e) {
+    // Handle import error
+    logger()->error('XML import failed: ' . $e->getMessage());
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Casts" icon="wand-magic-sparkles" href="/casts">
+    Cast XML data to classes and models
+  </Card>
+  <Card title="Transformers" icon="arrows-rotate" href="/transformers">
+    Transform XML data before use
+  </Card>
+  <Card title="Optimization" icon="gauge-high" href="/optimization">
+    Optimize key naming conventions
+  </Card>
+  <Card title="Exporting" icon="file-export" href="/exporting">
+    Export data to XML format
+  </Card>
+</CardGroup>

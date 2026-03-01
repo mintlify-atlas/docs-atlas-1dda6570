@@ -1,0 +1,422 @@
+---
+title: 'XMLCollection'
+description: 'Complete API reference for the XMLCollection class'
+---
+
+The `XMLCollection` class provides a powerful interface for working with imported XML data. It implements `ArrayAccess`, `Countable`, `IteratorAggregate`, and `JsonSerializable` interfaces.
+
+## Constructor
+
+```php
+new XMLCollection(XMLElement $items)
+```
+
+<ParamField path="items" type="XMLElement" required>
+  The XML element to wrap in a collection.
+</ParamField>
+
+<Note>
+  You typically don't instantiate XMLCollection directly. Use `XML::import()` instead.
+</Note>
+
+---
+
+## Core Methods
+
+### raw()
+
+Get the raw, unprocessed XML data.
+
+```php
+public function raw(): XMLElement
+```
+
+<ResponseField name="return" type="XMLElement">
+  Returns the original XMLElement instance.
+</ResponseField>
+
+```php
+$xml = XML::import('data.xml');
+$rawElement = $xml->raw();
+```
+
+### collect()
+
+Convert the XML data to a Laravel Collection.
+
+```php
+public function collect(): Collection
+```
+
+<ResponseField name="return" type="Collection">
+  Returns an Illuminate\Support\Collection instance.
+</ResponseField>
+
+```php
+$collection = $xml->collect();
+$filtered = $collection->filter(fn($item) => $item->active);
+```
+
+### get()
+
+Get the processed XML data with transformations applied.
+
+```php
+public function get(): XMLObject|array
+```
+
+<ResponseField name="return" type="XMLObject|array">
+  Returns the processed data as XMLObject or array.
+</ResponseField>
+
+```php
+$data = $xml->transform('users')->using('App\Transformers\UserTransformer')
+    ->get();
+```
+
+### getAsArray()
+
+Get the XML data as a plain array.
+
+```php
+public function getAsArray(): array
+```
+
+<ResponseField name="return" type="array">
+  Returns the data as a plain PHP array.
+</ResponseField>
+
+```php
+$array = $xml->getAsArray();
+```
+
+### toArray()
+
+Convert the collection to a plain array with nested conversions.
+
+```php
+public function toArray(): array
+```
+
+<ResponseField name="return" type="array">
+  Returns the collection as an array with all nested items converted.
+</ResponseField>
+
+```php
+$plainArray = $xml->toArray();
+```
+
+### toJson()
+
+Convert the collection to JSON.
+
+```php
+public function toJson(int $options = 0): string
+```
+
+<ParamField path="options" type="int" default="0">
+  JSON encoding options (same as `json_encode()`).
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Returns the JSON string representation.
+</ResponseField>
+
+```php
+$json = $xml->toJson(JSON_PRETTY_PRINT);
+```
+
+---
+
+## Transformation Methods
+
+### transform()
+
+Start a transformation for a specific key.
+
+```php
+public function transform(string $key): PendingTransform
+```
+
+<ParamField path="key" type="string" required>
+  The key to transform.
+</ParamField>
+
+<ResponseField name="return" type="PendingTransform">
+  Returns a PendingTransform instance for chaining.
+</ResponseField>
+
+```php
+$xml->transform('users')
+    ->using('App\Transformers\UserTransformer')
+    ->get();
+
+// Using callable
+$xml->transform('price')
+    ->using(fn($value) => (float) $value)
+    ->get();
+```
+
+### expect()
+
+Alias for the `transform()` method.
+
+```php
+public function expect(string $key): PendingTransform
+```
+
+<ParamField path="key" type="string" required>
+  The key to transform.
+</ParamField>
+
+<ResponseField name="return" type="PendingTransform">
+  Returns a PendingTransform instance.
+</ResponseField>
+
+```php
+$xml->expect('users')
+    ->using('App\Transformers\UserTransformer');
+```
+
+### cast()
+
+Cast a key to a specific class or type.
+
+```php
+public function cast(string $key): PendingCast
+```
+
+<ParamField path="key" type="string" required>
+  The key to cast.
+</ParamField>
+
+<ResponseField name="return" type="PendingCast">
+  Returns a PendingCast instance for chaining.
+</ResponseField>
+
+```php
+$xml->cast('user')->to(User::class);
+$xml->cast('users')->to(User::class); // Works with arrays too
+```
+
+---
+
+## Optimization Methods
+
+### optimize()
+
+Apply key name optimization to the XML data.
+
+```php
+public function optimize(string $type = XML::OPTIMIZE_UNDERSCORE): self
+```
+
+<ParamField path="type" type="string" default="XML::OPTIMIZE_UNDERSCORE">
+  The optimization type. Options:
+  - `XML::OPTIMIZE_UNDERSCORE` - Convert to snake_case
+  - `XML::OPTIMIZE_CAMELCASE` - Convert to camelCase
+  - `XML::OPTIMIZE_NONE` - No transformation
+</ParamField>
+
+<ResponseField name="return" type="self">
+  Returns the collection instance for chaining.
+</ResponseField>
+
+```php
+use Flowgistics\XML\XML;
+
+// Convert keys to snake_case
+$xml->optimize(XML::OPTIMIZE_UNDERSCORE)->get();
+
+// Convert keys to camelCase
+$xml->optimize(XML::OPTIMIZE_CAMELCASE)->get();
+
+// No optimization
+$xml->optimize(XML::OPTIMIZE_NONE)->get();
+```
+
+<Info>
+  Optimization is applied recursively to all nested keys in the XML structure.
+</Info>
+
+---
+
+## Array Access Methods
+
+XMLCollection implements `ArrayAccess`, allowing you to use array syntax:
+
+### Array Access Examples
+
+```php
+// Check if key exists
+if (isset($xml['users'])) {
+    // Key exists
+}
+
+// Get value
+$users = $xml['users'];
+
+// Set value
+$xml['users'] = $newUsers;
+
+// Unset value
+unset($xml['users']);
+```
+
+### offsetExists()
+
+```php
+public function offsetExists(mixed $offset): bool
+```
+
+### offsetGet()
+
+```php
+public function offsetGet(mixed $offset): mixed
+```
+
+### offsetSet()
+
+```php
+public function offsetSet(mixed $offset, mixed $value): void
+```
+
+### offsetUnset()
+
+```php
+public function offsetUnset(mixed $offset): void
+```
+
+---
+
+## Magic Methods
+
+### __get()
+
+Get an item from the XML using property access.
+
+```php
+public function __get(string $key): mixed
+```
+
+```php
+$users = $xml->users;
+```
+
+### __set()
+
+Set an item in the XML using property access.
+
+```php
+public function __set(string $name, mixed $value): void
+```
+
+```php
+$xml->users = $newUsers;
+```
+
+### __isset()
+
+Check if an item exists using property access.
+
+```php
+public function __isset(string $name): bool
+```
+
+```php
+if (isset($xml->users)) {
+    // Property exists
+}
+```
+
+### __call()
+
+Forward method calls to the underlying XMLObject.
+
+```php
+public function __call(string $name, array $arguments): mixed
+```
+
+```php
+// Any method called on XMLCollection is forwarded to XMLObject
+$xml->customMethod();
+```
+
+---
+
+## Countable Interface
+
+### count()
+
+Count the number of items in the collection.
+
+```php
+public function count(): int
+```
+
+<ResponseField name="return" type="int">
+  Returns the number of items.
+</ResponseField>
+
+```php
+$itemCount = count($xml);
+// or
+$itemCount = $xml->count();
+```
+
+---
+
+## IteratorAggregate Interface
+
+### getIterator()
+
+Get an iterator for the items.
+
+```php
+public function getIterator(): ArrayIterator
+```
+
+<ResponseField name="return" type="ArrayIterator">
+  Returns an ArrayIterator instance.
+</ResponseField>
+
+```php
+foreach ($xml as $key => $value) {
+    // Iterate through items
+}
+```
+
+---
+
+## Complete Example
+
+```php
+use Flowgistics\XML\Facades\XML;
+use App\Transformers\UserTransformer;
+use App\Models\User;
+
+// Import and process XML
+$xml = XML::import('users.xml')
+    ->optimize(XML::OPTIMIZE_UNDERSCORE)
+    ->transform('users')
+    ->using(UserTransformer::class)
+    ->cast('created_at')
+    ->to('datetime');
+
+// Access data
+$users = $xml->users;
+
+// Convert to array
+$array = $xml->toArray();
+
+// Convert to JSON
+$json = $xml->toJson(JSON_PRETTY_PRINT);
+
+// Iterate
+foreach ($xml as $key => $value) {
+    echo "$key: $value";
+}
+
+// Count items
+echo count($xml);
+```

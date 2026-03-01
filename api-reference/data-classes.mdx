@@ -1,0 +1,500 @@
+---
+title: 'Data Classes'
+description: 'Complete API reference for XMLElement and XMLObject data classes'
+---
+
+The data classes provide object-oriented interfaces for working with XML data. `XMLElement` extends SimpleXMLElement for raw XML operations, while `XMLObject` provides array-like access to processed XML data.
+
+## XMLElement
+
+The `XMLElement` class extends PHP's `SimpleXMLElement` with additional helper methods for working with XML attributes.
+
+### Class Definition
+
+```php
+class XMLElement extends SimpleXMLElement
+```
+
+<Info>
+  XMLElement inherits all methods from PHP's SimpleXMLElement. See [PHP documentation](https://www.php.net/manual/en/class.simplexmlelement.php) for inherited methods.
+</Info>
+
+### attribute()
+
+Get an XML attribute value by name.
+
+```php
+public function attribute(string $name, mixed $default = null): mixed
+```
+
+<ParamField path="name" type="string" required>
+  The name of the attribute to retrieve.
+</ParamField>
+
+<ParamField path="default" type="mixed" default="null">
+  Default value to return if the attribute doesn't exist.
+</ParamField>
+
+<ResponseField name="return" type="mixed">
+  Returns the attribute value as a string, or the default value if not found.
+</ResponseField>
+
+```php
+// XML: <user id="123" role="admin" />
+$userId = $element->attribute('id'); // "123"
+$role = $element->attribute('role'); // "admin"
+$status = $element->attribute('status', 'active'); // "active" (default)
+```
+
+### hasAttribute()
+
+Check if an attribute exists.
+
+```php
+public function hasAttribute(string $attribute): bool
+```
+
+<ParamField path="attribute" type="string" required>
+  The name of the attribute to check.
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  Returns true if the attribute exists, false otherwise.
+</ResponseField>
+
+```php
+// XML: <user id="123" name="John" />
+if ($element->hasAttribute('id')) {
+    $id = $element->attribute('id');
+}
+
+if (!$element->hasAttribute('email')) {
+    // Email attribute not present
+}
+```
+
+### Usage Example
+
+```php
+use Flowgistics\XML\Facades\XML;
+
+// Import XML with raw mode
+$xml = XML::import('users.xml', true);
+
+// Access elements
+foreach ($xml->user as $user) {
+    // Get attributes
+    $id = $user->attribute('id');
+    $role = $user->attribute('role', 'user');
+    
+    // Check attributes
+    if ($user->hasAttribute('verified')) {
+        $verified = $user->attribute('verified');
+    }
+    
+    // Access element values
+    $name = (string) $user->name;
+    $email = (string) $user->email;
+}
+```
+
+---
+
+## XMLObject
+
+The `XMLObject` class provides an array-like interface for working with processed XML data. It implements `ArrayAccess`, `Countable`, `IteratorAggregate`, and `JsonSerializable`.
+
+### Class Definition
+
+```php
+class XMLObject implements ArrayAccess, Countable, IteratorAggregate, JsonSerializable
+```
+
+### Constructor
+
+```php
+new XMLObject(array $xml)
+```
+
+<ParamField path="xml" type="array" required>
+  The XML data as an associative array.
+</ParamField>
+
+```php
+$object = new XMLObject([
+    'name' => 'John Doe',
+    'email' => 'john@example.com',
+    '@attributes' => ['id' => '123']
+]);
+```
+
+<Note>
+  XML attributes are automatically extracted from the `@attributes` key during construction.
+</Note>
+
+---
+
+## Attribute Methods
+
+### attribute()
+
+Get an attribute value from the XML object.
+
+```php
+public function attribute(string $name, mixed $default = null): mixed
+```
+
+<ParamField path="name" type="string" required>
+  The attribute name.
+</ParamField>
+
+<ParamField path="default" type="mixed" default="null">
+  Default value if attribute doesn't exist.
+</ParamField>
+
+<ResponseField name="return" type="mixed">
+  Returns the attribute value or default.
+</ResponseField>
+
+```php
+$userId = $xmlObject->attribute('id');
+$status = $xmlObject->attribute('status', 'active');
+```
+
+### hasAttribute()
+
+Check if an attribute exists.
+
+```php
+public function hasAttribute(string $attribute): bool
+```
+
+<ParamField path="attribute" type="string" required>
+  The attribute name to check.
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  Returns true if the attribute exists.
+</ResponseField>
+
+```php
+if ($xmlObject->hasAttribute('verified')) {
+    // Attribute exists
+}
+```
+
+---
+
+## Array Access
+
+XMLObject implements `ArrayAccess` for array-like operations.
+
+### offsetExists()
+
+Check if a key exists.
+
+```php
+public function offsetExists(mixed $offset): bool
+```
+
+```php
+if (isset($xmlObject['name'])) {
+    // Key exists
+}
+```
+
+### offsetGet()
+
+Get a value by key.
+
+```php
+public function offsetGet(mixed $offset): mixed
+```
+
+```php
+$name = $xmlObject['name'];
+```
+
+### offsetSet()
+
+Set a value by key.
+
+```php
+public function offsetSet(mixed $offset, mixed $value): void
+```
+
+```php
+$xmlObject['name'] = 'Jane Doe';
+$xmlObject[] = 'New item'; // Append
+```
+
+### offsetUnset()
+
+Remove a key.
+
+```php
+public function offsetUnset(mixed $offset): void
+```
+
+```php
+unset($xmlObject['name']);
+```
+
+---
+
+## Magic Methods
+
+### __get()
+
+Access items using property syntax.
+
+```php
+public function __get(string $key): mixed
+```
+
+```php
+$name = $xmlObject->name;
+$email = $xmlObject->email;
+```
+
+### __set()
+
+Set items using property syntax.
+
+```php
+public function __set(string $key, mixed $value): void
+```
+
+```php
+$xmlObject->name = 'John Doe';
+$xmlObject->email = 'john@example.com';
+```
+
+### __isset()
+
+Check if a property exists.
+
+```php
+public function __isset(string $name): bool
+```
+
+```php
+if (isset($xmlObject->name)) {
+    // Property exists
+}
+```
+
+---
+
+## Countable Interface
+
+### count()
+
+Count the number of items.
+
+```php
+public function count(): int
+```
+
+<ResponseField name="return" type="int">
+  Returns the number of items in the object.
+</ResponseField>
+
+```php
+$itemCount = count($xmlObject);
+// or
+$itemCount = $xmlObject->count();
+```
+
+---
+
+## IteratorAggregate Interface
+
+### getIterator()
+
+Get an iterator for the items.
+
+```php
+public function getIterator(): ArrayIterator
+```
+
+<ResponseField name="return" type="ArrayIterator">
+  Returns an ArrayIterator instance.
+</ResponseField>
+
+```php
+foreach ($xmlObject as $key => $value) {
+    echo "$key: $value\n";
+}
+```
+
+---
+
+## JSON Serialization
+
+### toJson()
+
+Convert the object to a JSON string.
+
+```php
+public function toJson(int $options = 0): string
+```
+
+<ParamField path="options" type="int" default="0">
+  JSON encoding options (same as `json_encode()`).
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Returns the JSON string.
+</ResponseField>
+
+```php
+$json = $xmlObject->toJson();
+$prettyJson = $xmlObject->toJson(JSON_PRETTY_PRINT);
+```
+
+### jsonSerialize()
+
+Prepare the object for JSON serialization.
+
+```php
+public function jsonSerialize(): array
+```
+
+<ResponseField name="return" type="array">
+  Returns an array representation suitable for JSON encoding.
+</ResponseField>
+
+```php
+$data = json_encode($xmlObject);
+```
+
+---
+
+## Array Conversion
+
+### toArray()
+
+Convert the object to a plain PHP array.
+
+```php
+public function toArray(): array
+```
+
+<ResponseField name="return" type="array">
+  Returns the object as a plain array with nested conversions.
+</ResponseField>
+
+```php
+$array = $xmlObject->toArray();
+```
+
+<Info>
+  The `toArray()` method recursively converts nested XMLObject instances to arrays.
+</Info>
+
+---
+
+## Complete Examples
+
+### Working with XMLElement
+
+```php
+use Flowgistics\XML\Facades\XML;
+
+// Sample XML
+$xmlString = '<?xml version="1.0"?>
+<users>
+    <user id="1" role="admin">
+        <name>John Doe</name>
+        <email>john@example.com</email>
+    </user>
+    <user id="2" role="user">
+        <name>Jane Smith</name>
+        <email>jane@example.com</email>
+    </user>
+</users>';
+
+file_put_contents('users.xml', $xmlString);
+
+// Import as raw XMLElement
+$xml = XML::import('users.xml', true);
+
+// Iterate and access attributes
+foreach ($xml->user as $user) {
+    $id = $user->attribute('id');
+    $role = $user->attribute('role', 'guest');
+    $name = (string) $user->name;
+    $email = (string) $user->email;
+    
+    echo "User #$id: $name ($role) - $email\n";
+    
+    // Check for optional attributes
+    if ($user->hasAttribute('verified')) {
+        $verified = $user->attribute('verified');
+        echo "Verified: $verified\n";
+    }
+}
+```
+
+### Working with XMLObject
+
+```php
+use Flowgistics\XML\Facades\XML;
+
+// Import XML (returns XMLCollection, which contains XMLObject)
+$collection = XML::import('users.xml');
+$data = $collection->get();
+
+// Access as object properties
+echo $data->user->name;
+
+// Access as array
+echo $data['user']['email'];
+
+// Modify data
+$data->user->status = 'active';
+$data['user']['last_login'] = now();
+
+// Check existence
+if (isset($data->user)) {
+    // User exists
+}
+
+// Count items
+echo "Total items: " . count($data);
+
+// Iterate
+foreach ($data as $key => $value) {
+    echo "$key: " . print_r($value, true);
+}
+
+// Convert to JSON
+$json = $data->toJson(JSON_PRETTY_PRINT);
+
+// Convert to array
+$array = $data->toArray();
+
+// Access attributes
+$userId = $data->attribute('id');
+if ($data->hasAttribute('version')) {
+    $version = $data->attribute('version');
+}
+```
+
+---
+
+## Key Differences
+
+| Feature | XMLElement | XMLObject |
+|---------|-----------|----------|
+| Extends | SimpleXMLElement | None |
+| Raw XML | Yes | No |
+| Processed Data | No | Yes |
+| Array Access | Limited | Full |
+| Modification | Limited | Full |
+| Best For | Reading XML structure | Working with data |
+
+<Note>
+  Use `XMLElement` when you need to work with the raw XML structure. Use `XMLObject` when you need to manipulate the data as arrays or objects.
+</Note>

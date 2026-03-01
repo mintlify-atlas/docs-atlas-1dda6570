@@ -1,0 +1,307 @@
+---
+title: Transforming XML data
+description: Apply transformations to XML data before processing
+---
+
+Transformers allow you to modify XML data during the import process. They're perfect for filtering, normalizing, or reshaping data before it reaches your application.
+
+## Basic transformers
+
+Apply a transformer to an XML element using the `transform()` method:
+
+```php
+use Flowgistics\XML\XML;
+use Flowgistics\XML\Transformers\ArrayTransformer;
+
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(ArrayTransformer::class)
+    ->get();
+```
+
+## The expect() alias
+
+Use `expect()` as a more readable alias for `transform()`:
+
+```php
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+
+// This is equivalent to:
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(ArrayTransformer::class)
+    ->get();
+```
+
+## Built-in transformers
+
+### Array transformer
+
+The `ArrayTransformer` wraps elements in an array using Laravel's `Arr::wrap()` helper. This ensures a consistent array format, even for single elements:
+
+```php
+use Flowgistics\XML\XML;
+
+// Using the 'array' alias
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+
+// $xml->note will always be an array
+```
+
+This is particularly useful when XML might contain a single element or multiple elements:
+
+```xml
+<!-- Single note -->
+<notes>
+    <note>...</note>
+</notes>
+
+<!-- Multiple notes -->
+<notes>
+    <note>...</note>
+    <note>...</note>
+</notes>
+```
+
+Without the transformer, a single note would be an object, while multiple notes would be an array. The `ArrayTransformer` ensures consistent behavior.
+
+## Creating custom transformers
+
+Create custom transformers by implementing the `Transformer` interface:
+
+```php
+use Flowgistics\XML\Transformers\Transformer;
+
+class CompletedNoteFilter implements Transformer
+{
+    /**
+     * Filter only the completed notes.
+     *
+     * @param mixed $data
+     * @return array|mixed
+     */
+    public static function apply($data)
+    {
+        return array_filter($data, function ($note) {
+            return $note->attribute('completed', false) === 'true';
+        });
+    }
+}
+
+$xml = XML::import('notes-2.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->get();
+
+// $xml->note now only contains completed notes
+```
+
+The `Transformer` interface requires a single static method:
+
+- `apply(mixed $data): mixed` - Receives the XML data and returns the transformed result
+
+## Using closures
+
+You can also use closures for simple transformations:
+
+```php
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(function ($notes) {
+        return array_map(function ($note) {
+            $note->body = strtoupper($note->body);
+            return $note;
+        }, $notes);
+    })
+    ->get();
+```
+
+## Multiple transformers
+
+Apply multiple transformers to different elements:
+
+```php
+$xml = XML::import('data.xml')
+    ->expect('note')->as('array')
+    ->transform('comment')->with(CommentTransformer::class)
+    ->transform('user')->with(UserTransformer::class)
+    ->get();
+```
+
+## Transformer examples
+
+### Uppercase transformer
+
+```php
+class UppercaseTransformer implements Transformer
+{
+    public static function apply($data): mixed
+    {
+        if (is_array($data)) {
+            return array_map([self::class, 'apply'], $data);
+        }
+        
+        if (is_object($data) && method_exists($data, 'toArray')) {
+            $array = $data->toArray();
+            return self::apply($array);
+        }
+        
+        return is_string($data) ? strtoupper($data) : $data;
+    }
+}
+```
+
+### Date formatter
+
+```php
+use Carbon\Carbon;
+use Flowgistics\XML\Transformers\Transformer;
+
+class DateFormatter implements Transformer
+{
+    public static function apply($data): mixed
+    {
+        return array_map(function ($item) {
+            if (isset($item->created_at)) {
+                $item->created_at = Carbon::parse($item->created_at)
+                    ->format('Y-m-d H:i:s');
+            }
+            return $item;
+        }, $data);
+    }
+}
+```
+
+### Attribute extractor
+
+```php
+class AttributeExtractor implements Transformer
+{
+    public static function apply($data): mixed
+    {
+        return array_map(function ($item) {
+            // Extract attribute to property
+            if ($item->hasAttribute('completed')) {
+                $item->completed = $item->attribute('completed');
+            }
+            return $item;
+        }, $data);
+    }
+}
+```
+
+## Combining with casts
+
+Transformers run before casts, allowing you to prepare data before casting to classes:
+
+```php
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')        // Transform to array first
+    ->cast('note')->to(Note::class)      // Then cast to Note class
+    ->get();
+```
+
+## Real-world example
+
+Here's a complete example from the package's examples folder (examples/transformers.php:33):
+
+```php
+use Flowgistics\XML\Data\XMLElement;
+use Flowgistics\XML\Transformers\Transformer;
+use Flowgistics\XML\XML;
+
+class CompletedNoteFilter implements Transformer
+{
+    /**
+     * Filter only the completed notes.
+     *
+     * @param mixed $data
+     * @return array|mixed
+     */
+    public static function apply($data)
+    {
+        return array_filter($data, function ($note) {
+            /**
+             * @var $note XMLElement
+             */
+            return $note->attribute('completed', false) === 'true';
+        });
+    }
+}
+
+$xml = XML::import('notes-2.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->get();
+
+// $xml->note now only has notes that are completed
+```
+
+With the XML file:
+
+```xml
+<notes>
+    <note completed="true">
+        <to>Foo</to>
+        <from>Bar</from>
+        <body>FooBar!</body>
+    </note>
+    <note completed="false">
+        <to>Foo</to>
+        <from>Bar</from>
+        <body>FooBar!</body>
+    </note>
+</notes>
+```
+
+The result will only include the first note since it's the only one with `completed="true"`.
+
+## When to use transformers
+
+Use transformers when you need to:
+
+- **Filter data** - Remove unwanted elements
+- **Normalize data** - Ensure consistent formats
+- **Enrich data** - Add calculated or derived values
+- **Reshape data** - Restructure the data format
+- **Validate data** - Check and filter invalid entries
+
+<Note>
+Transformers are applied during the import process before the final `get()` call. They modify the data in place within the `XMLCollection`.
+</Note>
+
+## Transform execution order
+
+Transformations are applied in the order they're defined:
+
+```php
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(FilterTransformer::class)   // Applied first
+    ->transform('note')->with(SortTransformer::class)     // Applied second
+    ->get();
+```
+
+## Best practices
+
+1. **Keep transformers focused** - Each transformer should do one thing well
+2. **Use type hints** - Document expected input and output types
+3. **Handle edge cases** - Check for null values and empty arrays
+4. **Make them reusable** - Design transformers to work across different contexts
+5. **Test thoroughly** - Ensure transformers handle all data variations
+
+<Warning>
+Transformers modify the data permanently. Once applied, the original data structure is replaced. If you need the original data, access it before applying transformers.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Casts" icon="wand-magic-sparkles" href="/casts">
+    Cast transformed data to classes
+  </Card>
+  <Card title="Importing" icon="file-import" href="/importing">
+    Learn more about importing XML
+  </Card>
+  <Card title="Optimization" icon="gauge-high" href="/optimization">
+    Optimize key naming conventions
+  </Card>
+</CardGroup>

@@ -1,0 +1,499 @@
+---
+title: "View exports"
+description: "Advanced guide to exporting Laravel Blade views as XML"
+---
+
+## Overview
+
+View exports allow you to generate XML using Laravel Blade templates. This approach gives you the full power of Blade's templating engine - loops, conditionals, components, and more - while generating well-formed XML documents.
+
+View exports are ideal for:
+- Complex XML structures with conditional elements
+- Reusing existing Blade templates
+- XML with dynamic content that changes based on data
+- Large XML files where array syntax becomes unwieldy
+
+## Basic view export
+
+Create a Blade view file with XML markup, then export it using the `XML::exportView()` method:
+
+### Create the Blade view
+
+Create a file at `resources/views/files.blade.php`:
+
+```blade
+@foreach($files as $file)
+    <file>
+        <name>{{ $file['name'] }}</name>
+        <type>{{ $file['type'] }}</type>
+    </file>
+@endforeach
+```
+
+### Export the view
+
+```php
+use Flowgistics\XML\XML;
+
+$data = [
+    'files' => [
+        ['name' => 'file1', 'type' => 'pdf'],
+        ['name' => 'file2', 'type' => 'png'],
+        ['name' => 'file3', 'type' => 'xml'],
+    ],
+];
+
+$xml = XML::exportView('files', $data)
+    ->setRootTag('files')
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->toString();
+```
+
+### Generated output
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+    <file>
+        <name>file1</name>
+        <type>pdf</type>
+    </file>
+    <file>
+        <name>file2</name>
+        <type>png</type>
+    </file>
+    <file>
+        <name>file3</name>
+        <type>xml</type>
+    </file>
+</files>
+```
+
+## View exports without root tag
+
+If your Blade view already includes a root element, you can disable the automatic root tag wrapper:
+
+### Blade view with root element
+
+```blade
+<files>
+    @foreach($files as $file)
+        <file>
+            <name>{{ $file['name'] }}</name>
+            <type>{{ $file['type'] }}</type>
+        </file>
+    @endforeach
+</files>
+```
+
+### Export without root tag
+
+```php
+$xml = XML::exportView('no-root', $data)
+    ->disableRootTag()
+    ->toString();
+```
+
+<Tip>
+Use `disableRootTag()` when your Blade template manages its own root element structure.
+</Tip>
+
+## Exporting to files
+
+Save the generated XML directly to a file:
+
+```php
+XML::exportView('files', $data)
+    ->setRootTag('files')
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->toFile('output/files.xml');
+```
+
+The `toFile()` method uses Laravel's `File` facade, which automatically creates parent directories if they don't exist.
+
+## Configuration options
+
+View exports support all the standard XML builder configuration:
+
+```php
+XML::exportView('products', $data)
+    ->setRootTag('catalog')           // Set custom root tag
+    ->version('1.0')                  // XML version
+    ->encoding('UTF-8')               // Character encoding
+    ->toString();
+```
+
+### Available methods
+
+<ParamField path="setRootTag" type="string|false">
+  Set the root element name. Pass `false` or use `disableRootTag()` to disable.
+</ParamField>
+
+<ParamField path="disableRootTag" type="void">
+  Disable the automatic root element wrapper.
+</ParamField>
+
+<ParamField path="version" type="string" default="1.0">
+  Set the XML version in the prolog.
+</ParamField>
+
+<ParamField path="encoding" type="string" default="UTF-8">
+  Set the character encoding in the prolog.
+</ParamField>
+
+<ParamField path="toString" type="string">
+  Return the XML as a string.
+</ParamField>
+
+<ParamField path="toFile" type="void">
+  Save the XML to a file at the specified path.
+</ParamField>
+
+## Advanced Blade techniques
+
+### Conditional elements
+
+Use Blade conditionals to include elements only when certain conditions are met:
+
+```blade
+<products>
+    @foreach($products as $product)
+        <product>
+            <name>{{ $product['name'] }}</name>
+            <price>{{ $product['price'] }}</price>
+            
+            @if(isset($product['sale_price']))
+                <sale_price>{{ $product['sale_price'] }}</sale_price>
+            @endif
+            
+            @if($product['in_stock'])
+                <availability>In Stock</availability>
+            @else
+                <availability>Out of Stock</availability>
+            @endif
+        </product>
+    @endforeach
+</products>
+```
+
+### Nested loops
+
+Generate complex nested XML structures:
+
+```blade
+<catalog>
+    @foreach($categories as $category)
+        <category name="{{ $category['name'] }}">
+            @foreach($category['products'] as $product)
+                <product>
+                    <id>{{ $product['id'] }}</id>
+                    <name>{{ $product['name'] }}</name>
+                    <price>{{ $product['price'] }}</price>
+                </product>
+            @endforeach
+        </category>
+    @endforeach
+</catalog>
+```
+
+### XML attributes
+
+Add attributes using Blade variable syntax:
+
+```blade
+@foreach($notes as $note)
+    <note 
+        id="{{ $note['id'] }}" 
+        priority="{{ $note['priority'] }}"
+        @if($note['completed']) completed="true" @endif
+    >
+        <to>{{ $note['to'] }}</to>
+        <from>{{ $note['from'] }}</from>
+        <message>{{ $note['message'] }}</message>
+    </note>
+@endforeach
+```
+
+### CDATA sections
+
+Wrap content that may contain special characters:
+
+```blade
+@foreach($articles as $article)
+    <article>
+        <title>{{ $article['title'] }}</title>
+        <content><![CDATA[{{ $article['content'] }}]]></content>
+    </article>
+@endforeach
+```
+
+### Blade components
+
+Reuse XML structures with Blade components:
+
+```blade
+{{-- resources/views/components/product-item.blade.php --}}
+<product id="{{ $id }}">
+    <name>{{ $name }}</name>
+    <price>{{ $price }}</price>
+    {{ $slot }}
+</product>
+```
+
+```blade
+{{-- resources/views/products.blade.php --}}
+<products>
+    @foreach($products as $product)
+        <x-product-item :id="$product['id']" :name="$product['name']" :price="$product['price']">
+            @if(isset($product['description']))
+                <description>{{ $product['description'] }}</description>
+            @endif
+        </x-product-item>
+    @endforeach
+</products>
+```
+
+## Escaping special characters
+
+Blade automatically escapes HTML entities with `{{ }}`. For XML, this is usually what you want:
+
+```blade
+<note>
+    <message>{{ $message }}</message> {{-- Escapes <, >, &, etc. --}}
+</note>
+```
+
+If you need unescaped output (not recommended unless you trust the source), use `{!! !!}`:
+
+```blade
+<note>
+    <html_content>{!! $trustedHtmlContent !!}</html_content>
+</note>
+```
+
+<Warning>
+Only use `{!! !!}` with trusted data. Unescaped content can break your XML structure.
+</Warning>
+
+## Using view composers
+
+Leverage Laravel's view composers to automatically inject data:
+
+```php
+// In a service provider
+use Illuminate\Support\Facades\View;
+
+public function boot()
+{
+    View::composer('xml.products', function ($view) {
+        $view->with('timestamp', now()->toIso8601String());
+    });
+}
+```
+
+```blade
+{{-- resources/views/xml/products.blade.php --}}
+<products generated="{{ $timestamp }}">
+    @foreach($products as $product)
+        {{-- product markup --}}
+    @endforeach
+</products>
+```
+
+## Performance considerations
+
+### Large datasets
+
+For very large XML files, consider chunking your data:
+
+```php
+// Instead of loading all records at once
+$products = Product::all();
+
+// Chunk the query
+Product::chunk(1000, function ($products) {
+    $xml = XML::exportView('products-chunk', ['products' => $products])
+        ->disableRootTag()
+        ->toString();
+    
+    // Append to file
+    file_put_contents('products.xml', $xml, FILE_APPEND);
+});
+```
+
+### View caching
+
+Laravel caches compiled Blade views, but you can also cache the final XML output:
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+$xml = Cache::remember('products-xml', 3600, function () use ($data) {
+    return XML::exportView('products', $data)
+        ->setRootTag('catalog')
+        ->toString();
+});
+```
+
+## How view exports work internally
+
+The `ViewExporter` class extends `XMLBuilder` and renders your Blade view, wrapping it with XML prolog and root tags:
+
+```php
+// Simplified from ViewExporter.php
+public function __construct(string $viewName, array $data = [])
+{
+    parent::__construct();
+    
+    // Render the Blade view
+    $this->view = view($viewName, $data)->render();
+}
+
+public function toString(): string
+{
+    return sprintf(
+        "%s%s%s%s",
+        $this->getProlog(),        // <?xml version="1.0" encoding="UTF-8"?>
+        $this->openRootTag(),      // <root>
+        $this->view,               // Your rendered Blade content
+        $this->closeRootTag()      // </root>
+    );
+}
+```
+
+## Debugging view exports
+
+To debug what your Blade template generates before XML wrapping:
+
+```php
+// Render the view directly
+$rendered = view('files', $data)->render();
+dd($rendered);
+
+// Or use Ray/dump
+ray(view('files', $data)->render());
+```
+
+## Common patterns
+
+<AccordionGroup>
+  <Accordion title="RSS feed generation">
+    ```blade
+    <rss version="2.0">
+        <channel>
+            <title>{{ $feed['title'] }}</title>
+            <link>{{ $feed['url'] }}</link>
+            <description>{{ $feed['description'] }}</description>
+            
+            @foreach($items as $item)
+                <item>
+                    <title>{{ $item['title'] }}</title>
+                    <link>{{ $item['url'] }}</link>
+                    <description>{{ $item['description'] }}</description>
+                    <pubDate>{{ $item['published_at']->toRssString() }}</pubDate>
+                </item>
+            @endforeach
+        </channel>
+    </rss>
+    ```
+  </Accordion>
+
+  <Accordion title="Sitemap generation">
+    ```blade
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        @foreach($urls as $url)
+            <url>
+                <loc>{{ $url['location'] }}</loc>
+                <lastmod>{{ $url['modified_at'] }}</lastmod>
+                <changefreq>{{ $url['change_frequency'] }}</changefreq>
+                <priority>{{ $url['priority'] }}</priority>
+            </url>
+        @endforeach
+    </urlset>
+    ```
+  </Accordion>
+
+  <Accordion title="Configuration file export">
+    ```blade
+    <configuration>
+        <settings>
+            @foreach($settings as $key => $value)
+                <setting name="{{ $key }}">{{ $value }}</setting>
+            @endforeach
+        </settings>
+        
+        <features>
+            @foreach($features as $feature => $enabled)
+                <feature name="{{ $feature }}" enabled="{{ $enabled ? 'true' : 'false' }}" />
+            @endforeach
+        </features>
+    </configuration>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Keep views focused on structure">
+    Let Blade templates focus on XML structure. Keep business logic in controllers or services:
+    
+    ```php
+    // Good: Logic in controller
+    $products = Product::with('category')
+        ->where('active', true)
+        ->get()
+        ->map(fn($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'price' => number_format($p->price, 2),
+        ]);
+        
+    $xml = XML::exportView('products', ['products' => $products]);
+    ```
+  </Accordion>
+
+  <Accordion title="Use consistent indentation">
+    While whitespace doesn't affect XML parsing, consistent indentation improves readability:
+    
+    ```blade
+    <products>
+        @foreach($products as $product)
+            <product>
+                <name>{{ $product['name'] }}</name>
+                <price>{{ $product['price'] }}</price>
+            </product>
+        @endforeach
+    </products>
+    ```
+  </Accordion>
+
+  <Accordion title="Validate XML output">
+    For production exports, validate your XML against a schema:
+    
+    ```php
+    $xml = XML::exportView('products', $data)->toString();
+    
+    $dom = new \DOMDocument();
+    $dom->loadXML($xml);
+    
+    if (!$dom->schemaValidate('path/to/schema.xsd')) {
+        throw new \Exception('Invalid XML generated');
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related topics
+
+<CardGroup cols={2}>
+  <Card title="Exporting XML" icon="file-export" href="/exporting">
+    Learn the basics of exporting XML from arrays
+  </Card>
+  
+  <Card title="Custom transformers" icon="code" href="/advanced/custom-transformers">
+    Process XML data with custom transformer classes
+  </Card>
+</CardGroup>

@@ -1,0 +1,279 @@
+---
+title: Exporting to XML
+description: Learn how to export arrays and Laravel views to XML format
+---
+
+The Laravel XML package provides powerful exporting capabilities to convert PHP arrays and Laravel views into well-formed XML documents.
+
+## Exporting arrays
+
+Export PHP arrays to XML using the `XML::export()` method:
+
+```php
+use Flowgistics\XML\XML;
+
+$data = [
+    'note' => [
+        'to' => 'John',
+        'from' => 'Jane',
+        'heading' => 'Reminder',
+        'body' => 'Meeting at 3pm'
+    ]
+];
+
+$xml = XML::export($data)->toString();
+```
+
+This generates:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <note>
+        <to>John</to>
+        <from>Jane</from>
+        <heading>Reminder</heading>
+        <body>Meeting at 3pm</body>
+    </note>
+</root>
+```
+
+## Configuring the XML output
+
+The `XMLBuilder` class provides several configuration options:
+
+### Setting the XML version
+
+Specify the XML version (defaults to "1.0"):
+
+```php
+XML::export($data)
+    ->version('1.1')
+    ->toString();
+```
+
+### Setting the encoding
+
+Set the character encoding (defaults to "UTF-8"):
+
+```php
+XML::export($data)
+    ->encoding('ISO-8859-1')
+    ->toString();
+```
+
+### Customizing the root tag
+
+Change the root tag name from the default "root":
+
+```php
+XML::export($data)
+    ->rootTag('notes')
+    ->toString();
+```
+
+This generates:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<notes>
+    <!-- content here -->
+</notes>
+```
+
+### Disabling the root tag
+
+Remove the root tag entirely:
+
+```php
+XML::export($data)
+    ->disableRootTag()
+    ->toString();
+```
+
+### Setting the item name
+
+Customize the default name for array items without keys:
+
+```php
+$data = ['Apple', 'Banana', 'Orange'];
+
+XML::export($data)
+    ->itemName('fruit')
+    ->toString();
+```
+
+This generates:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <fruit>Apple</fruit>
+    <fruit>Banana</fruit>
+    <fruit>Orange</fruit>
+</root>
+```
+
+### Force item name usage
+
+Force the use of the item name instead of generating names based on the root tag:
+
+```php
+XML::export($data)
+    ->forceItemName()
+    ->toString();
+```
+
+## Pretty output
+
+Format the XML output with indentation for readability:
+
+```php
+$xml = XML::export($data)
+    ->usePrettyOutput()
+    ->toString();
+
+// Or pass it directly to toString()
+$xml = XML::export($data)->toString(true);
+```
+
+## Saving to file
+
+Save the XML directly to a file:
+
+```php
+XML::export($data)
+    ->usePrettyOutput()
+    ->toFile('output.xml');
+```
+
+## Exporting nested arrays
+
+The exporter handles nested arrays automatically:
+
+```php
+$data = [
+    'notes' => [
+        [
+            'to' => 'John',
+            'from' => 'Jane',
+            'body' => 'First note'
+        ],
+        [
+            'to' => 'Alice',
+            'from' => 'Bob',
+            'body' => 'Second note'
+        ]
+    ]
+];
+
+$xml = XML::export($data)->toString();
+```
+
+This generates:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+    <notes>
+        <note>
+            <to>John</to>
+            <from>Jane</from>
+            <body>First note</body>
+        </note>
+        <note>
+            <to>Alice</to>
+            <from>Bob</from>
+            <body>Second note</body>
+        </note>
+    </notes>
+</root>
+```
+
+<Note>
+The exporter automatically converts numeric array keys into singular forms of the parent element name.
+</Note>
+
+## Exporting Laravel views
+
+Export Laravel Blade views to XML format using `XML::exportView()`:
+
+```php
+$xml = XML::exportView('notes.show', ['note' => $note])->toString();
+```
+
+The `exportView()` method accepts:
+
+- `$viewName` (string) - The name of the view
+- `$data` (array, optional) - Data to pass to the view
+
+### View example
+
+Create a Blade view at `resources/views/notes/show.blade.php`:
+
+```xml
+@foreach($notes as $note)
+<note completed="{{ $note->completed }}">
+    <to>{{ $note->to }}</to>
+    <from>{{ $note->from }}</from>
+    <heading>{{ $note->heading }}</heading>
+    <body>{{ $note->body }}</body>
+</note>
+@endforeach
+```
+
+Then export it:
+
+```php
+$notes = Note::all();
+
+$xml = XML::exportView('notes.show', ['notes' => $notes])
+    ->rootTag('notes')
+    ->toString();
+```
+
+### Saving view exports
+
+Save the exported view to a file:
+
+```php
+XML::exportView('notes.show', ['notes' => $notes])
+    ->rootTag('notes')
+    ->toFile('notes.xml');
+```
+
+## Chaining configuration
+
+Chain multiple configuration methods together:
+
+```php
+$xml = XML::export($data)
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->rootTag('notes')
+    ->itemName('note')
+    ->usePrettyOutput()
+    ->toString();
+```
+
+## Working with the XMLBuilder
+
+Both `ArrayExporter` and `ViewExporter` extend the `XMLBuilder` class, which provides these methods:
+
+- `version(string $version)` - Set the XML version
+- `encoding(string $encoding)` - Set the character encoding
+- `rootTag(string $name)` - Set the root tag name
+- `itemName(string $name)` - Set the default item name
+- `disableRootTag()` - Disable the root tag
+- `forceItemName()` - Force usage of item name
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Importing" icon="file-import" href="/importing">
+    Import XML files into your application
+  </Card>
+  <Card title="Optimization" icon="gauge-high" href="/optimization">
+    Optimize key naming conventions
+  </Card>
+</CardGroup>

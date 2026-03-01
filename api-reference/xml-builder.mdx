@@ -1,0 +1,362 @@
+---
+title: 'XMLBuilder'
+description: 'Complete API reference for the XMLBuilder class'
+---
+
+The `XMLBuilder` class provides the foundation for building XML documents. It's extended by `ArrayExporter` and `ViewExporter`.
+
+## Constructor
+
+```php
+new XMLBuilder(string $encoding = 'UTF-8', string $version = '1.0')
+```
+
+<ParamField path="encoding" type="string" default="UTF-8">
+  The encoding to use for the XML document.
+</ParamField>
+
+<ParamField path="version" type="string" default="1.0">
+  The XML version to use.
+</ParamField>
+
+```php
+$builder = new XMLBuilder('UTF-8', '1.0');
+```
+
+<Note>
+  You typically don't use XMLBuilder directly. Use `XML::export()` or `XML::exportView()` instead.
+</Note>
+
+---
+
+## Configuration Methods
+
+### version()
+
+Set the XML version.
+
+```php
+public function version(string $version = "1.0"): XMLBuilder
+```
+
+<ParamField path="version" type="string" default="1.0">
+  The XML version string.
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->version('1.1');
+```
+
+### encoding()
+
+Set the XML encoding.
+
+```php
+public function encoding(string $encoding = "UTF-8"): XMLBuilder
+```
+
+<ParamField path="encoding" type="string" default="UTF-8">
+  The character encoding (e.g., UTF-8, ISO-8859-1).
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->encoding('ISO-8859-1');
+```
+
+### rootTag()
+
+Set the name of the root XML tag.
+
+```php
+public function rootTag(string $name = "root"): XMLBuilder
+```
+
+<ParamField path="name" type="string" default="root">
+  The name for the root tag.
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->rootTag('users');
+// Produces: <users>...</users>
+```
+
+### setRootTag()
+
+Set or disable the root tag.
+
+```php
+public function setRootTag(string|bool $tag): static
+```
+
+<ParamField path="tag" type="string|bool" required>
+  The root tag name, or `false` to disable the root tag.
+</ParamField>
+
+<ResponseField name="return" type="static">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->setRootTag('data');
+$builder->setRootTag(false); // Disable root tag
+```
+
+### disableRootTag()
+
+Disable the root tag wrapper.
+
+```php
+public function disableRootTag(): static
+```
+
+<ResponseField name="return" type="static">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->disableRootTag();
+// No root tag will be added
+```
+
+<Warning>
+  Disabling the root tag may produce invalid XML if you have multiple top-level elements.
+</Warning>
+
+### itemName()
+
+Set the default name for items without explicit keys.
+
+```php
+public function itemName(string $name = "item"): XMLBuilder
+```
+
+<ParamField path="name" type="string" default="item">
+  The default name for array items without keys.
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->itemName('record');
+```
+
+---
+
+## Data Methods
+
+### data()
+
+Set the data to be exported.
+
+```php
+public function data(array $data): XMLBuilder
+```
+
+<ParamField path="data" type="array" required>
+  The array data to convert to XML.
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->data([
+    'user' => [
+        'name' => 'John',
+        'email' => 'john@example.com'
+    ]
+]);
+```
+
+### forceItemName()
+
+Force usage of the item name instead of auto-generating names based on the root tag.
+
+```php
+public function forceItemName(): XMLBuilder
+```
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->forceItemName()->itemName('entry');
+```
+
+---
+
+## Protected Methods
+
+These methods are used internally by exporters but can be useful to understand the XML generation process.
+
+### getProlog()
+
+Generate the XML prolog (declaration).
+
+```php
+protected function getProlog(): string
+```
+
+<ResponseField name="return" type="string">
+  Returns the XML prolog string.
+</ResponseField>
+
+```php
+// Produces: <?xml version="1.0" encoding="UTF-8"?>
+```
+
+### openRootTag()
+
+Generate the opening root tag.
+
+```php
+protected function openRootTag(): string
+```
+
+<ResponseField name="return" type="string">
+  Returns the opening tag or empty string if root tag is disabled.
+</ResponseField>
+
+```php
+// Produces: <root>
+```
+
+### closeRootTag()
+
+Generate the closing root tag.
+
+```php
+protected function closeRootTag(): string
+```
+
+<ResponseField name="return" type="string">
+  Returns the closing tag or empty string if root tag is disabled.
+</ResponseField>
+
+```php
+// Produces: </root>
+```
+
+### getRootTag()
+
+Get the current root tag name.
+
+```php
+protected function getRootTag(): string
+```
+
+<ResponseField name="return" type="string">
+  Returns the root tag name (defaults to 'root').
+</ResponseField>
+
+### getFieldName()
+
+Generate the name for top-level tags.
+
+```php
+protected function getFieldName(string|int $field): string
+```
+
+<ParamField path="field" type="string|int" required>
+  The field name or numeric index.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Returns the generated field name.
+</ResponseField>
+
+### generateFieldName()
+
+Generate field names for numeric keys.
+
+```php
+protected function generateFieldName(string $field): string
+```
+
+<ParamField path="field" type="string" required>
+  The parent field name.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Returns the singular form of the field name or the configured item name.
+</ResponseField>
+
+---
+
+## Magic Methods
+
+### __call()
+
+Handle dynamic setters for configuration properties.
+
+```php
+public function __call(string $name, array $arguments): XMLBuilder
+```
+
+<ParamField path="name" type="string" required>
+  The method name (must be one of: version, rootTag, encoding, itemName).
+</ParamField>
+
+<ParamField path="arguments" type="array" required>
+  The method arguments (exactly one argument required).
+</ParamField>
+
+<ResponseField name="return" type="XMLBuilder">
+  Returns the builder instance for chaining.
+</ResponseField>
+
+```php
+$builder->version('1.0')
+        ->encoding('UTF-8')
+        ->rootTag('data')
+        ->itemName('record');
+```
+
+---
+
+## Complete Example
+
+```php
+use Flowgistics\XML\XMLBuilder;
+
+$builder = new XMLBuilder();
+
+$xml = $builder
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->rootTag('users')
+    ->itemName('user')
+    ->data([
+        ['name' => 'John', 'email' => 'john@example.com'],
+        ['name' => 'Jane', 'email' => 'jane@example.com']
+    ]);
+```
+
+<Info>
+  In practice, use `XML::export()` which returns an `ArrayExporter` that extends `XMLBuilder` with additional export functionality.
+</Info>
+
+## Inheritance
+
+The following classes extend XMLBuilder:
+
+- `ArrayExporter` - Exports arrays to XML
+- `ViewExporter` - Exports Blade views to XML
+
+See their respective documentation pages for export-specific methods.

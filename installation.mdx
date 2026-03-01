@@ -1,0 +1,111 @@
+---
+title: Installation
+description: Install Laravel XML in your application using Composer and start working with XML data in minutes.
+---
+
+## Requirements
+
+Before installing Laravel XML, ensure your environment meets these requirements:
+
+- PHP 8.0 or higher
+- Laravel 8.47 or higher
+- PHP extensions: `ext-dom`, `ext-simplexml`, `ext-json`
+
+These extensions are typically enabled by default in most PHP installations.
+
+## Install via Composer
+
+Install the package using Composer:
+
+```bash
+composer require flowgistics/laravel-xml
+```
+
+The package will be downloaded and added to your `composer.json` file automatically.
+
+## Service provider registration
+
+Laravel XML supports package auto-discovery, which means the service provider and facade are registered automatically when you install the package.
+
+You can immediately start using the `XML` facade in your application without any additional configuration:
+
+```php
+use XML;
+
+$data = XML::import('data.xml')->get();
+```
+
+<Note>
+  If you've disabled package auto-discovery in your Laravel application, you'll need to manually register the service provider in `config/app.php`:
+
+  ```php
+  'providers' => [
+      // Other service providers...
+      Flowgistics\XML\XMLServiceProvider::class,
+  ],
+  ```
+
+  And the facade:
+
+  ```php
+  'aliases' => [
+      // Other aliases...
+      'XML' => Flowgistics\XML\XMLFacade::class,
+  ],
+  ```
+</Note>
+
+## Optional dependencies
+
+If you plan to use the view export feature to render Laravel Blade views as XML, ensure you have the illuminate/view package installed. This is included by default in standard Laravel installations:
+
+```json
+{
+  "require": {
+    "illuminate/view": ">=8.47"
+  }
+}
+```
+
+## Verify installation
+
+To verify Laravel XML is installed correctly, try importing a simple XML file:
+
+<Steps>
+  <Step title="Create a test XML file">
+    Create a file called `test.xml` in your project root:
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <root>
+        <message>Hello from Laravel XML!</message>
+    </root>
+    ```
+  </Step>
+
+  <Step title="Import the file in tinker">
+    Open Laravel Tinker and import the file:
+
+    ```bash
+    php artisan tinker
+    ```
+
+    ```php
+    >>> $xml = \XML::import('test.xml')->get();
+    >>> $xml->message;
+    => "Hello from Laravel XML!"
+    ```
+  </Step>
+
+  <Step title="Celebrate">
+    If you see the message output, Laravel XML is installed and working correctly!
+  </Step>
+</Steps>
+
+## Next steps
+
+Now that you have Laravel XML installed, proceed to the quickstart guide to learn the basics:
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Learn how to import and export XML with a complete working example
+</Card>

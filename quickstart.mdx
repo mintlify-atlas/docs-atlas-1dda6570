@@ -1,80 +1,290 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Laravel XML by learning how to import XML files, cast data to models, transform structures, and export data back to XML format.
 ---
 
-## Get started in three steps
+This guide walks you through the fundamental features of Laravel XML using a practical example: managing notes in XML format.
 
-Get your documentation site running locally and make your first customization.
+## Import XML data
 
-### Step 1: Set up your local environment
+Let's start by importing an XML file containing notes. Create a file called `notes.xml`:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+```xml
+<notes count="2">
+    <note completed="true">
+        <to>John</to>
+        <from>Jane</from>
+        <heading>Meeting</heading>
+        <body>Don't forget about our meeting tomorrow!</body>
+        <completed_at>01-01-2024 12:00</completed_at>
+    </note>
+    <note completed="false">
+        <to>Sarah</to>
+        <from>Mike</from>
+        <heading>Project Update</heading>
+        <body>Please review the latest changes.</body>
+        <completed_at/>
+    </note>
+</notes>
+```
 
-### Step 2: Deploy your changes
+Import this file using the `XML` facade:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+```php
+use XML;
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+$notes = XML::import('notes.xml')->get();
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+// Access elements
+echo $notes->note[0]->to; // "John"
+echo $notes->note[1]->heading; // "Project Update"
 
-### Step 3: Go live
+// Access attributes
+echo $notes->note[0]->attribute('completed'); // "true"
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Cast to Eloquent models
+
+One of Laravel XML's most powerful features is automatic casting to Eloquent models. Define a `Note` model:
+
+```php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Note extends Model
+{
+    protected $fillable = [
+        'to',
+        'from',
+        'heading',
+        'body',
+        'completed_at',
+    ];
+
+    protected $casts = [
+        'completed_at' => 'datetime',
+    ];
+}
+```
+
+Now cast XML elements directly to `Note` model instances:
+
+```php
+use App\Models\Note;
+use XML;
+
+$data = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// Each note is now a Note model instance
+foreach ($data->note as $note) {
+    echo $note->to; // Access as model properties
+    echo $note->completed_at->format('Y-m-d'); // Use Laravel's date casting
+}
+```
+
+<Note>
+  The `cast()` method works with arrays of elements automatically. If `note` contains multiple items, each one will be cast to a `Note` instance.
+</Note>
+
+## Transform XML data
+
+Transformers let you modify XML data before using it. The built-in `array` transformer ensures an element is always an array:
+
+```php
+$data = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+
+// $data->note is now always an array, even if XML contains a single note
+foreach ($data->note as $note) {
+    // Process notes
+}
+```
+
+Create custom transformers for advanced filtering. This example filters only completed notes:
+
+```php
+use Flowgistics\XML\Transformers\Transformer;
+use Flowgistics\XML\Data\XMLElement;
+
+class CompletedNotesFilter implements Transformer
+{
+    public static function apply($data)
+    {
+        return array_filter($data, function ($note) {
+            return $note->attribute('completed') === 'true';
+        });
+    }
+}
+```
+
+Apply your custom transformer:
+
+```php
+$completedNotes = XML::import('notes.xml')
+    ->transform('note')->with(CompletedNotesFilter::class)
+    ->get();
+
+// $completedNotes->note now contains only notes with completed="true"
+```
+
+## Optimize key names
+
+XML element names often use different casing than your application. Use the `optimize()` method to convert keys:
+
+```php
+// Convert to snake_case
+$data = XML::import('notes.xml')
+    ->optimize('underscore')
+    ->get();
+
+// Convert to camelCase
+$data = XML::import('notes.xml')
+    ->optimize('camelcase')
+    ->get();
+
+echo $data->note[0]->completedAt; // Converted from completed_at
+```
+
+This is particularly useful when importing XML from external APIs that don't follow Laravel naming conventions.
+
+## Export data to XML
+
+Export PHP arrays to XML format using the `export()` method:
+
+```php
+use XML;
+
+$data = [
+    'note' => [
+        [
+            'to' => 'John',
+            'from' => 'Jane',
+            'heading' => 'Reminder',
+            'body' => 'Call the client tomorrow',
+        ],
+        [
+            'to' => 'Sarah',
+            'from' => 'Mike',
+            'heading' => 'Follow-up',
+            'body' => 'Send the proposal',
+        ],
+    ],
+];
+
+$xml = XML::export($data)
+    ->rootTag('notes')
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->toString();
+
+echo $xml;
+```
+
+Output:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<notes>
+    <note>
+        <to>John</to>
+        <from>Jane</from>
+        <heading>Reminder</heading>
+        <body>Call the client tomorrow</body>
+    </note>
+    <note>
+        <to>Sarah</to>
+        <from>Mike</from>
+        <heading>Follow-up</heading>
+        <body>Send the proposal</body>
+    </note>
+</notes>
+```
+
+## Save exported XML to file
+
+Save the generated XML directly to a file:
+
+```php
+XML::export($data)
+    ->rootTag('notes')
+    ->toFile('output.xml');
+```
+
+For pretty-printed output with indentation:
+
+```php
+XML::export($data)
+    ->rootTag('notes')
+    ->usePrettyOutput()
+    ->toFile('output.xml');
+```
+
+## Complete example
+
+Here's a complete example that imports notes, filters completed ones, casts them to models, and exports them:
+
+```php
+use App\Models\Note;
+use Flowgistics\XML\Transformers\Transformer;
+use XML;
+
+// Custom transformer
+class CompletedNotesFilter implements Transformer
+{
+    public static function apply($data)
+    {
+        return array_filter($data, function ($note) {
+            return $note->attribute('completed') === 'true';
+        });
+    }
+}
+
+// Import and process
+$data = XML::import('notes.xml')
+    ->transform('note')->with(CompletedNotesFilter::class)
+    ->expect('note')->as('array')
+    ->cast('note')->to(Note::class)
+    ->optimize('camelcase')
+    ->get();
+
+// Work with models
+foreach ($data->note as $note) {
+    echo "Task for {$note->to}: {$note->heading}\n";
+}
+
+// Export back to XML
+$exportData = array_map(fn($note) => [
+    'to' => $note->to,
+    'from' => $note->from,
+    'heading' => $note->heading,
+    'body' => $note->body,
+], $data->note);
+
+XML::export(['note' => $exportData])
+    ->rootTag('completed_notes')
+    ->usePrettyOutput()
+    ->toFile('completed.xml');
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you understand the basics, explore advanced features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Importing" icon="file-import">
+    Learn about raw imports, remote URLs, and advanced parsing options
+  </Card>
+  <Card title="Exporting" icon="file-export">
+    Discover view exports, custom root tags, and export configuration
+  </Card>
+  <Card title="Casting" icon="wand-magic-sparkles">
+    Master custom casts and the Castable interface for complex objects
+  </Card>
+  <Card title="Transforming" icon="shuffle">
+    Create advanced transformers for complex data manipulation
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

@@ -1,0 +1,209 @@
+---
+title: Examples
+description: Real-world examples and use cases for Laravel XML
+---
+
+This page provides practical examples of how you can use Laravel XML in your applications. Each example demonstrates a specific feature or use case.
+
+## Basic XML import
+
+The simplest way to import and work with XML files is using the `import()` method.
+
+```php
+use Flowgistics\XML\XML;
+
+$notes = XML::import('notes.xml')->get();
+
+// Access attributes
+$count = $notes->attribute('count');
+```
+
+### Sample XML structure
+
+```xml
+<notes count="1">
+    <note completed="true">
+        <to.user>test</to.user>
+        <to attr="test">Foo</to>
+        <from>Bar</from>
+        <heading>Baz</heading>
+        <body>FooBar!</body>
+        <created_at/>
+        <updated_at/>
+        <completed_at>01-01-1970 12:00</completed_at>
+    </note>
+</notes>
+```
+
+## Casting XML to models
+
+You can cast XML elements to PHP classes for better type safety and structure.
+
+<AccordionGroup>
+  <Accordion title="Model cast">
+    Cast XML elements directly to Eloquent models:
+
+    ```php
+    use Flowgistics\XML\XML;
+
+    class Note extends \Illuminate\Database\Eloquent\Model
+    {
+        protected $fillable = [
+            'to',
+            'from',
+            'heading',
+            'body',
+            'completed_at',
+        ];
+    }
+
+    $xml = XML::import('notes.xml')
+        ->cast('note')->to(Note::class)
+        ->get();
+
+    // $xml->note is now a Note model instance
+    ```
+  </Accordion>
+
+  <Accordion title="Castable cast">
+    Implement the `Castable` interface for custom casting logic:
+
+    ```php
+    use Flowgistics\XML\Casts\Castable;
+    use Flowgistics\XML\XML;
+
+    class TextNote implements Castable
+    {
+        public function __construct($to, $from, $text)
+        {
+            // Your custom initialization logic
+        }
+
+        public static function fromCast(array $data): Castable
+        {
+            return new TextNote($data['to'], $data['from'], $data['body']);
+        }
+    }
+
+    $xml = XML::import('notes.xml')
+        ->cast('note')->to(TextNote::class)
+        ->get();
+    ```
+  </Accordion>
+
+  <Accordion title="Default cast">
+    Cast to any PHP class with a constructor that accepts an array:
+
+    ```php
+    use Flowgistics\XML\XML;
+
+    class MyNote
+    {
+        public function __construct($data)
+        {
+            // Process the data array
+        }
+    }
+
+    $xml = XML::import('notes.xml')
+        ->cast('note')->to(MyNote::class)
+        ->get();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Transformers
+
+Transformers allow you to modify XML data during import. You can use built-in transformers or create your own.
+
+<CodeGroup>
+```php Built-in array transformer
+use Flowgistics\XML\XML;
+
+// Using the alias
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+
+// Or using the class directly
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(ArrayTransformer::class)
+    ->get();
+
+// $xml->note will always be an array
+```
+
+```php Custom transformer
+use Flowgistics\XML\Data\XMLElement;
+use Flowgistics\XML\Transformers\Transformer;
+use Flowgistics\XML\XML;
+
+class CompletedNoteFilter implements Transformer
+{
+    /**
+     * Filter only the completed notes.
+     *
+     * @param mixed $data
+     *
+     * @return array|mixed
+     */
+    public static function apply($data)
+    {
+        return array_filter($data, function ($note) {
+            /**
+             * @var $note XMLElement
+             */
+            return $note->attribute('completed', false) === 'true';
+        });
+    }
+}
+
+$xml = XML::import('notes-2.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->get();
+
+// $xml->note now only contains completed notes
+```
+</CodeGroup>
+
+### Working with multiple notes
+
+When your XML contains multiple elements, transformers help you process them efficiently:
+
+```xml
+<notes>
+    <note completed="true">
+        <to>Foo</to>
+        <from>Bar</from>
+        <heading>Baz</heading>
+        <body>FooBar!</body>
+        <created_at/>
+        <updated_at/>
+        <completed_at>01-01-1970 12:00</completed_at>
+    </note>
+    <note completed="false">
+        <to>Foo</to>
+        <from>Bar</from>
+        <heading>Baz</heading>
+        <body>FooBar!</body>
+        <created_at>01-01-1970 10:00</created_at>
+        <updated_at/>
+        <completed_at/>
+    </note>
+</notes>
+```
+
+<Tip>
+Custom transformers are perfect for filtering, sorting, or modifying XML data before it reaches your application logic.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced usage" icon="code" href="/advanced">
+    Learn about validation, exports, and more
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

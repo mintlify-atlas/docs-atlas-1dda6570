@@ -1,0 +1,280 @@
+---
+title: Key optimization
+description: Transform XML element names to match your coding conventions
+---
+
+The Laravel XML package provides key optimization features that automatically convert XML element names to match your preferred naming convention, making it easier to work with XML data that doesn't follow PHP naming standards.
+
+## Available optimization types
+
+The package supports three optimization modes defined as constants in the `XML` class (src/XML.php:16):
+
+- `XML::OPTIMIZE_UNDERSCORE` - Convert to snake_case
+- `XML::OPTIMIZE_CAMELCASE` - Convert to camelCase
+- `XML::OPTIMIZE_NONE` - No optimization (default)
+
+## Underscore optimization
+
+Convert all XML element names to snake_case:
+
+```php
+use Flowgistics\XML\XML;
+
+$xml = XML::import('notes.xml')
+    ->optimize(XML::OPTIMIZE_UNDERSCORE)
+    ->get();
+
+// Access with snake_case
+$completedAt = $xml->note->completed_at;
+$createdAt = $xml->note->created_at;
+```
+
+Given this XML:
+
+```xml
+<notes>
+    <note>
+        <to.user>test</to.user>
+        <to attr="test">Foo</to>
+        <CompletedAt>01-01-1970 12:00</CompletedAt>
+    </note>
+</notes>
+```
+
+After optimization:
+
+```php
+$xml->note->to_user        // "test"
+$xml->note->to             // "Foo"
+$xml->note->completed_at   // "01-01-1970 12:00"
+```
+
+## CamelCase optimization
+
+Convert all XML element names to camelCase:
+
+```php
+use Flowgistics\XML\XML;
+
+$xml = XML::import('notes.xml')
+    ->optimize(XML::OPTIMIZE_CAMELCASE)
+    ->get();
+
+// Access with camelCase
+$completedAt = $xml->note->completedAt;
+$createdAt = $xml->note->createdAt;
+```
+
+Given the same XML above:
+
+```php
+$xml->note->toUser       // "test"
+$xml->note->to           // "Foo"
+$xml->note->completedAt  // "01-01-1970 12:00"
+```
+
+## How optimization works
+
+Optimization is applied recursively through the entire XML structure. The transformation happens during the `get()` call via the `applyOptimize()` method (src/Data/XMLCollection.php:310):
+
+```php
+private function applyOptimize(): XMLObject
+{
+    if ($this->optimize === XML::OPTIMIZE_UNDERSCORE) {
+        $method = static fn (string $key): string => Str::snake(str_replace('.', '_', $key));
+    } elseif ($this->optimize === XML::OPTIMIZE_CAMELCASE) {
+        $method = static fn (string $key): string => Str::camel(str_replace('.', '_', $key));
+    } else {
+        return $this->items;
+    }
+
+    return new XMLObject($this->loopOptimize($this->items->toArray(), $method));
+}
+```
+
+## Dot notation handling
+
+Both optimization modes handle dots in element names by converting them to underscores first:
+
+```xml
+<note>
+    <to.user>John</to.user>
+    <from.email>jane@example.com</from.email>
+</note>
+```
+
+**With underscore optimization:**
+
+```php
+$xml->note->to_user       // "John"
+$xml->note->from_email    // "jane@example.com"
+```
+
+**With camelCase optimization:**
+
+```php
+$xml->note->toUser       // "John"
+$xml->note->fromEmail    // "jane@example.com"
+```
+
+## Using the shorthand method
+
+You can pass the optimization type as a string:
+
+```php
+// These are equivalent
+$xml = XML::import('notes.xml')->optimize('underscore')->get();
+$xml = XML::import('notes.xml')->optimize(XML::OPTIMIZE_UNDERSCORE)->get();
+
+// CamelCase
+$xml = XML::import('notes.xml')->optimize('camelcase')->get();
+$xml = XML::import('notes.xml')->optimize(XML::OPTIMIZE_CAMELCASE)->get();
+```
+
+## Nested structure optimization
+
+Optimization is applied to all levels of the XML structure:
+
+```xml
+<root>
+    <UserProfile>
+        <FirstName>John</FirstName>
+        <LastName>Doe</LastName>
+        <ContactInfo>
+            <EmailAddress>john@example.com</EmailAddress>
+            <PhoneNumber>555-1234</PhoneNumber>
+        </ContactInfo>
+    </UserProfile>
+</root>
+```
+
+**With underscore optimization:**
+
+```php
+$xml->user_profile->first_name  // "John"
+$xml->user_profile->last_name   // "Doe"
+$xml->user_profile->contact_info->email_address  // "john@example.com"
+$xml->user_profile->contact_info->phone_number   // "555-1234"
+```
+
+**With camelCase optimization:**
+
+```php
+$xml->userProfile->firstName  // "John"
+$xml->userProfile->lastName   // "Doe"
+$xml->userProfile->contactInfo->emailAddress  // "john@example.com"
+$xml->userProfile->contactInfo->phoneNumber   // "555-1234"
+```
+
+## Combining with other features
+
+Optimization works seamlessly with casts and transformers:
+
+```php
+use Flowgistics\XML\XML;
+
+$notes = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->expect('note')->as('array')
+    ->optimize('camelcase')
+    ->get();
+```
+
+<Note>
+Optimization is applied after transformers but before the final output. This ensures the transformed data has the correct key names.
+</Note>
+
+## Real-world example
+
+Combining all features for a complete workflow:
+
+```php
+use Flowgistics\XML\XML;
+use Illuminate\Database\Eloquent\Model;
+
+class Note extends Model
+{
+    protected $fillable = [
+        'to',
+        'from',
+        'heading',
+        'body',
+        'completed_at',
+    ];
+}
+
+$notes = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->expect('note')->as('array')
+    ->optimize(XML::OPTIMIZE_UNDERSCORE)
+    ->get();
+
+// All keys are now snake_case, matching Laravel conventions
+foreach ($notes->note as $note) {
+    // Access using snake_case
+    echo $note->completed_at;
+    $note->save();
+}
+```
+
+## When to use optimization
+
+Use optimization when:
+
+- **Working with external APIs** - XML from external sources often uses different naming conventions
+- **Legacy systems** - Old systems might use PascalCase or other formats
+- **Consistency** - You want to maintain consistent naming across your Laravel application
+- **Code standards** - Your team follows specific naming conventions (PSR, Laravel style guide)
+
+## Performance considerations
+
+Optimization adds minimal overhead since it's applied once during the `get()` call. The recursive transformation is efficient and handles deeply nested structures well.
+
+## Default behavior
+
+By default, no optimization is applied (`XML::OPTIMIZE_NONE`). Element names are returned exactly as they appear in the XML:
+
+```php
+$xml = XML::import('notes.xml')->get();
+
+// Keys remain unchanged
+$xml->Note->CompletedAt  // Original casing preserved
+```
+
+## Choosing the right optimization
+
+**Use `OPTIMIZE_UNDERSCORE` when:**
+- Following Laravel naming conventions
+- Working with database columns (snake_case is standard)
+- Casting to Eloquent models with snake_case attributes
+
+**Use `OPTIMIZE_CAMELCASE` when:**
+- Working with JavaScript/JSON APIs
+- Prefer camelCase in your PHP code
+- Building APIs that return camelCase responses
+
+**Use `OPTIMIZE_NONE` when:**
+- You need to preserve original XML structure
+- The XML already follows your naming convention
+- You're performing custom transformations
+
+<Warning>
+Optimization changes all element names in the structure. Make sure this doesn't conflict with your transformers or casts that depend on specific key names.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Importing" icon="file-import" href="/importing">
+    Learn more about importing XML
+  </Card>
+  <Card title="Casts" icon="wand-magic-sparkles" href="/casts">
+    Cast optimized data to classes
+  </Card>
+  <Card title="Transformers" icon="arrows-rotate" href="/transformers">
+    Transform data before optimization
+  </Card>
+  <Card title="Exporting" icon="file-export" href="/exporting">
+    Export data to XML format
+  </Card>
+</CardGroup>

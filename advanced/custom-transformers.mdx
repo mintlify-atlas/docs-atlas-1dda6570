@@ -1,0 +1,409 @@
+---
+title: "Custom transformers"
+description: "Create custom transformer classes to process and filter XML data"
+---
+
+## Overview
+
+Transformers allow you to process XML data before it's returned to your application. Unlike casts which convert data into specific classes, transformers modify, filter, or restructure the data itself.
+
+Use transformers to:
+- Filter arrays of elements based on criteria
+- Ensure data is always in a specific format (e.g., always an array)
+- Transform data structures
+- Apply custom business logic to XML data
+
+## The Transformer interface
+
+All transformers must implement the `Transformer` interface with a single static `apply()` method:
+
+```php
+namespace Flowgistics\XML\Transformers;
+
+interface Transformer
+{
+    /**
+     * Apply is invoked before the final output is sent to the user.
+     *
+     * @param mixed $data - the xml data
+     * @return mixed
+     */
+    public static function apply(mixed $data): mixed;
+}
+```
+
+## Built-in array transformer
+
+The package includes an `ArrayTransformer` that ensures data is always wrapped in an array, even if there's only one element:
+
+```php
+use Flowgistics\XML\XML;
+
+// Using the built-in alias
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+
+// Equivalent to:
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(ArrayTransformer::class)
+    ->get();
+
+// $xml->note is always an array, even with one element
+```
+
+<Note>
+The `expect()` method is an alias for `transform()` - they work identically.
+</Note>
+
+### How ArrayTransformer works
+
+The `ArrayTransformer` uses Laravel's `Arr::wrap()` helper to ensure data is always an array:
+
+```php
+namespace Flowgistics\XML\Transformers;
+
+use Illuminate\Support\Arr;
+
+class ArrayTransformer implements Transformer
+{
+    public static function apply(mixed $data): array
+    {
+        return Arr::wrap($data);
+    }
+}
+```
+
+## Creating custom transformers
+
+Custom transformers give you complete control over how XML data is processed. Here are practical examples:
+
+### Filter transformer
+
+Filter elements based on specific criteria:
+
+```php
+use Flowgistics\XML\Data\XMLElement;
+use Flowgistics\XML\Transformers\Transformer;
+use Flowgistics\XML\XML;
+
+class CompletedNoteFilter implements Transformer
+{
+    /**
+     * Filter only the completed notes.
+     */
+    public static function apply(mixed $data): mixed
+    {
+        return array_filter($data, function ($note) {
+            /** @var XMLElement $note */
+            return $note->attribute('completed', false) === 'true';
+        });
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->get();
+
+// $xml->note now contains only notes with completed="true"
+```
+
+### Sort transformer
+
+Sort elements by a specific field:
+
+```php
+class PriceSorter implements Transformer
+{
+    public static function apply(mixed $data): array
+    {
+        $items = is_array($data) ? $data : [$data];
+        
+        usort($items, function ($a, $b) {
+            $priceA = (float) str_replace('$', '', $a->PRICE);
+            $priceB = (float) str_replace('$', '', $b->PRICE);
+            return $priceA <=> $priceB;
+        });
+        
+        return $items;
+    }
+}
+
+$xml = XML::import('plants.xml')
+    ->transform('PLANT')->with(PriceSorter::class)
+    ->get();
+
+// $xml->PLANT is sorted by price, lowest to highest
+```
+
+### Data enrichment transformer
+
+Add computed properties or enrich data:
+
+```php
+class NoteEnricher implements Transformer
+{
+    public static function apply(mixed $data): mixed
+    {
+        $notes = is_array($data) ? $data : [$data];
+        
+        return array_map(function ($note) {
+            // Add computed properties
+            $note->summary = substr($note->body, 0, 50) . '...';
+            $note->priority = strlen($note->body) > 100 ? 'high' : 'normal';
+            return $note;
+        }, $notes);
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(NoteEnricher::class)
+    ->get();
+
+// Each note now has summary and priority properties
+foreach ($xml->note as $note) {
+    echo "Priority: {$note->priority}\n";
+    echo "Summary: {$note->summary}\n";
+}
+```
+
+### Grouping transformer
+
+Group elements by a specific field:
+
+```php
+class CategoryGrouper implements Transformer
+{
+    public static function apply(mixed $data): array
+    {
+        $items = is_array($data) ? $data : [$data];
+        $grouped = [];
+        
+        foreach ($items as $item) {
+            $category = (string) $item->category;
+            if (!isset($grouped[$category])) {
+                $grouped[$category] = [];
+            }
+            $grouped[$category][] = $item;
+        }
+        
+        return $grouped;
+    }
+}
+
+$xml = XML::import('products.xml')
+    ->transform('product')->with(CategoryGrouper::class)
+    ->get();
+
+// $xml->product is now grouped by category
+foreach ($xml->product as $category => $products) {
+    echo "Category: {$category}\n";
+    foreach ($products as $product) {
+        echo "  - {$product->name}\n";
+    }
+}
+```
+
+## Configurable transformers
+
+For transformers that need configuration, you can use static properties or constants:
+
+```php
+class LimitTransformer implements Transformer
+{
+    public static int $limit = 10;
+    
+    public static function apply(mixed $data): array
+    {
+        $items = is_array($data) ? $data : [$data];
+        return array_slice($items, 0, self::$limit);
+    }
+}
+
+// Configure before using
+LimitTransformer::$limit = 5;
+
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(LimitTransformer::class)
+    ->get();
+
+// Only first 5 notes are returned
+```
+
+## Chaining multiple transformers
+
+You can apply multiple transformers to the same element:
+
+```php
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->transform('note')->with(ArrayTransformer::class)
+    ->get();
+
+// First filters completed notes, then ensures result is an array
+```
+
+<Warning>
+Transformers are applied in the order you chain them. Make sure the output of one transformer is compatible with the input expected by the next.
+</Warning>
+
+## Combining transformers with casts
+
+Transformers and casts can be used together. The order matters:
+
+```php
+// Transform first, then cast
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(CompletedNoteFilter::class)
+    ->cast('note')->to(Note::class)
+    ->get();
+// Filters notes, then casts remaining ones to Note models
+
+// Cast first, then transform
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->expect('note')->as('array')
+    ->get();
+// Casts to models, then ensures it's an array of models
+```
+
+<Tip>
+**Filter before casting** when you want to reduce the number of objects created. **Cast before transforming** when your transformer needs to work with class instances.
+</Tip>
+
+## Using closures as transformers
+
+For simple transformations, you can use a closure instead of creating a class:
+
+```php
+$xml = XML::import('notes.xml')
+    ->transform('note')->with(function ($data) {
+        // Simple filtering
+        return array_filter($data, function ($note) {
+            return $note->to === 'John';
+        });
+    })
+    ->get();
+```
+
+## Transform aliases
+
+The package provides a system for registering transformer aliases. The built-in `array` alias maps to `ArrayTransformer`:
+
+```php
+// From PendingTransform.php
+protected array $transformAliases = [
+    'array' => ArrayTransformer::class,
+];
+```
+
+You can use these aliases with the `as()` method:
+
+```php
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')
+    ->get();
+```
+
+<Note>
+Currently, the package only includes the `array` alias. You can extend `PendingTransform` to add your own aliases if needed.
+</Note>
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Keep transformers focused">
+    Each transformer should do one thing well. If you need multiple operations, chain multiple transformers:
+    
+    ```php
+    ->transform('item')->with(FilterTransformer::class)
+    ->transform('item')->with(SortTransformer::class)
+    ->transform('item')->with(LimitTransformer::class)
+    ```
+  </Accordion>
+
+  <Accordion title="Handle both single items and arrays">
+    XML elements might be a single item or an array. Write transformers that handle both:
+    
+    ```php
+    public static function apply(mixed $data): array
+    {
+        $items = is_array($data) ? $data : [$data];
+        // Process $items
+        return $processed;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Preserve data types when possible">
+    If you receive an array of `XMLElement` objects, try to return the same type:
+    
+    ```php
+    public static function apply(mixed $data): mixed
+    {
+        // Preserve the original structure
+        return array_filter($data, function ($item) {
+            return $item->isValid();
+        });
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Document expected input and output">
+    Use PHPDoc to make it clear what your transformer expects and returns:
+    
+    ```php
+    /**
+     * Filters completed notes.
+     * 
+     * @param XMLElement|XMLElement[] $data
+     * @return XMLElement[]
+     */
+    public static function apply(mixed $data): array
+    {
+        // ...
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance considerations
+
+Transformers run on every import, so optimize for performance:
+
+- **Avoid N+1 queries** - Don't make database calls inside transformers
+- **Use efficient algorithms** - For large datasets, choose efficient sorting and filtering
+- **Cache when possible** - If transformation involves expensive operations, consider caching
+
+```php
+class ExpensiveTransformer implements Transformer
+{
+    private static array $cache = [];
+    
+    public static function apply(mixed $data): mixed
+    {
+        $cacheKey = md5(serialize($data));
+        
+        if (isset(self::$cache[$cacheKey])) {
+            return self::$cache[$cacheKey];
+        }
+        
+        $result = self::performExpensiveOperation($data);
+        self::$cache[$cacheKey] = $result;
+        
+        return $result;
+    }
+}
+```
+
+## Related topics
+
+<CardGroup cols={2}>
+  <Card title="Custom casts" icon="code" href="/advanced/custom-casts">
+    Learn how to create custom cast classes for object conversion
+  </Card>
+  
+  <Card title="Importing XML" icon="file-import" href="/importing">
+    Learn the basics of importing XML files
+  </Card>
+</CardGroup>

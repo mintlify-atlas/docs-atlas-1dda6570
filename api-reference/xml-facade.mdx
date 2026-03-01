@@ -1,0 +1,169 @@
+---
+title: 'XML Facade'
+description: 'Complete API reference for the Laravel XML facade methods'
+---
+
+The `XML` facade provides a simple interface for importing and exporting XML data in Laravel applications.
+
+## Import Method
+
+Import XML data from a file path or URL.
+
+```php
+XML::import(string $path, bool $raw = false): XMLCollection|XMLElement
+```
+
+<ParamField path="path" type="string" required>
+  The path to the XML file or a URL. Can be a local file path or a remote URL.
+</ParamField>
+
+<ParamField path="raw" type="bool" default="false">
+  When set to `true`, returns raw `XMLElement` instead of processed `XMLCollection`.
+</ParamField>
+
+<ResponseField name="return" type="XMLCollection|XMLElement">
+  Returns an `XMLCollection` instance by default, or `XMLElement` if `$raw` is true.
+</ResponseField>
+
+### Basic Usage
+
+```php
+use Flowgistics\XML\Facades\XML;
+
+// Import from local file
+$xml = XML::import('path/to/file.xml');
+
+// Import from URL
+$xml = XML::import('https://example.com/data.xml');
+
+// Get raw XML element
+$raw = XML::import('path/to/file.xml', true);
+```
+
+<Note>
+  The import method automatically detects whether the path is a URL or local file.
+</Note>
+
+---
+
+## Export Method
+
+Export an array to XML format.
+
+```php
+XML::export(array $data): ArrayExporter
+```
+
+<ParamField path="data" type="array" required>
+  The array data to export as XML.
+</ParamField>
+
+<ResponseField name="return" type="ArrayExporter">
+  Returns an `ArrayExporter` instance that can be converted to string or saved to file.
+</ResponseField>
+
+### Basic Usage
+
+```php
+$data = [
+    'users' => [
+        ['name' => 'John', 'email' => 'john@example.com'],
+        ['name' => 'Jane', 'email' => 'jane@example.com'],
+    ]
+];
+
+// Export to string
+$xml = XML::export($data)->toString();
+
+// Export to file
+XML::export($data)->toFile('output.xml');
+
+// With pretty formatting
+$xml = XML::export($data)
+    ->usePrettyOutput()
+    ->toString();
+```
+
+### Customizing Export
+
+```php
+XML::export($data)
+    ->rootTag('data')
+    ->encoding('UTF-8')
+    ->version('1.0')
+    ->itemName('record')
+    ->toString();
+```
+
+---
+
+## Export View Method
+
+Export a Laravel Blade view as XML.
+
+```php
+XML::exportView(string $viewName, array $data = []): ViewExporter
+```
+
+<ParamField path="viewName" type="string" required>
+  The name of the Blade view to render as XML.
+</ParamField>
+
+<ParamField path="data" type="array" default="[]">
+  Data to pass to the view.
+</ParamField>
+
+<ResponseField name="return" type="ViewExporter">
+  Returns a `ViewExporter` instance that can be converted to string or saved to file.
+</ResponseField>
+
+### Basic Usage
+
+```php
+// Export view to string
+$xml = XML::exportView('xml.template', ['users' => $users])->toString();
+
+// Export view to file
+XML::exportView('xml.products', ['products' => $products])
+    ->toFile('products.xml');
+
+// Customize root tag
+XML::exportView('xml.report', $data)
+    ->rootTag('report')
+    ->toString();
+```
+
+### Example View
+
+```blade
+@foreach($users as $user)
+    <user>
+        <name>{{ $user->name }}</name>
+        <email>{{ $user->email }}</email>
+    </user>
+@endforeach
+```
+
+<Info>
+  Views are automatically wrapped with XML prolog and root tags. You only need to define the content.
+</Info>
+
+---
+
+## Constants
+
+The XML facade provides optimization constants for use with XMLCollection:
+
+```php
+XML::OPTIMIZE_UNDERSCORE  // Convert keys to snake_case
+XML::OPTIMIZE_CAMELCASE   // Convert keys to camelCase
+XML::OPTIMIZE_NONE        // No key transformation
+```
+
+### Usage with XMLCollection
+
+```php
+$xml = XML::import('data.xml')
+    ->optimize(XML::OPTIMIZE_UNDERSCORE)
+    ->get();
+```

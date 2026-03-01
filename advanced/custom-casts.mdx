@@ -1,0 +1,298 @@
+---
+title: "Custom casts"
+description: "Create custom cast classes to transform XML elements into your own objects"
+---
+
+## Overview
+
+Custom casts allow you to transform XML elements into specific PHP classes automatically during import. The Laravel XML package supports three types of casts:
+
+- **Eloquent models** - Cast directly to Laravel model instances
+- **Castable classes** - Implement the `Castable` interface for full control
+- **Default classes** - Any class with a constructor that accepts an array
+
+## The Castable interface
+
+The `Castable` interface provides a standardized way to define how your class should be instantiated from XML data.
+
+```php
+namespace Flowgistics\XML\Casts;
+
+interface Castable
+{
+    /**
+     * Invoked every time this class was cast to XMLElement.
+     *
+     * @param array $data
+     * @return Castable
+     */
+    public static function fromCast(array $data): self;
+}
+```
+
+## Casting to Eloquent models
+
+You can cast XML elements directly to Laravel Eloquent models. The package will pass the XML element's data as fillable attributes.
+
+```php
+use Flowgistics\XML\XML;
+use Illuminate\Database\Eloquent\Model;
+
+class Note extends Model
+{
+    protected $fillable = [
+        'to',
+        'from',
+        'heading',
+        'body',
+        'completed_at',
+    ];
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// $xml->note is now a Note model instance
+// Access properties: $xml->note->to, $xml->note->from
+```
+
+<Note>
+When casting to models, make sure the XML element keys match your model's fillable attributes.
+</Note>
+
+## Creating custom castable classes
+
+For complete control over object construction, implement the `Castable` interface. This is ideal when you need custom initialization logic or want to map XML data to specific constructor parameters.
+
+### Basic castable example
+
+```php
+use Flowgistics\XML\Casts\Castable;
+use Flowgistics\XML\XML;
+
+class TextNote implements Castable
+{
+    public function __construct(
+        public string $to,
+        public string $from,
+        public string $text
+    ) {}
+
+    public static function fromCast(array $data): Castable
+    {
+        return new TextNote(
+            $data['to'],
+            $data['from'],
+            $data['body']
+        );
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(TextNote::class)
+    ->get();
+
+// Access typed properties
+echo $xml->note->to;    // "John"
+echo $xml->note->from;  // "Jane"
+echo $xml->note->text;  // "Don't forget the meeting"
+```
+
+### Advanced castable with validation
+
+You can add validation, transformation, or default values in your `fromCast()` method:
+
+```php
+class Plant implements Castable
+{
+    public function __construct(
+        public string $common,
+        public string $botanical,
+        public string $zone,
+        public string $light,
+        public string $price,
+        public int $availability
+    ) {}
+
+    public static function fromCast(array $data): Castable
+    {
+        // You can add validation
+        if (empty($data['COMMON'])) {
+            throw new \InvalidArgumentException('Plant name is required');
+        }
+
+        // Transform data as needed
+        return new Plant(
+            $data['COMMON'],
+            $data['BOTANICAL'],
+            $data['ZONE'],
+            $data['LIGHT'],
+            $data['PRICE'],
+            (int) $data['AVAILABILITY']
+        );
+    }
+}
+
+$xml = XML::import('plants.xml')
+    ->cast('PLANT')->to(Plant::class)
+    ->get();
+
+// Each plant is now a typed Plant instance
+foreach ($xml->PLANT as $plant) {
+    echo "{$plant->common}: {$plant->price}\n";
+}
+```
+
+## Default class casting
+
+If your class doesn't implement `Castable` and isn't an Eloquent model, the package will pass the XML data array to your constructor:
+
+```php
+class MyNote
+{
+    private array $data;
+
+    public function __construct(array $data)
+    {
+        $this->data = $data;
+    }
+
+    public function getRecipient(): string
+    {
+        return $this->data['to'] ?? 'Unknown';
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(MyNote::class)
+    ->get();
+
+echo $xml->note->getRecipient();
+```
+
+## Casting arrays of elements
+
+When an XML element appears multiple times, the package automatically applies the cast to each instance:
+
+```xml
+<catalog>
+    <plant>
+        <common>Bloodroot</common>
+        <price>$2.44</price>
+    </plant>
+    <plant>
+        <common>Columbine</common>
+        <price>$9.37</price>
+    </plant>
+</catalog>
+```
+
+```php
+$xml = XML::import('plants.xml')
+    ->cast('plant')->to(Plant::class)
+    ->get();
+
+// $xml->plant is an array of Plant instances
+foreach ($xml->plant as $plant) {
+    echo $plant->common . "\n";
+}
+```
+
+## Combining casts with transformers
+
+You can chain casts with transformers for powerful data processing:
+
+```php
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->expect('note')->as('array')  // Ensure it's always an array
+    ->get();
+
+// $xml->note is always an array of Note models
+foreach ($xml->note as $note) {
+    // Process each note
+}
+```
+
+<Tip>
+Apply casts before transformers when you want to transform class instances. Apply transformers before casts when you want to filter or modify raw data first.
+</Tip>
+
+## How casting works internally
+
+The `Cast` class determines which casting method to use based on the target class:
+
+1. **Eloquent Model check** - If the target is a `Model` instance, it creates a new model with the data as fillable attributes
+2. **Castable interface check** - If the class implements `Castable`, it calls the static `fromCast()` method
+3. **Default instantiation** - Otherwise, it passes the data array to the constructor
+
+```php
+// From Cast.php (simplified)
+public static function to(array $what, $to): mixed
+{
+    $interfaces = class_implements($to);
+    
+    if ($to instanceof Model) {
+        return new ($to::class)($what);
+    }
+
+    if ($to instanceof Castable || isset($interfaces[Castable::class])) {
+        return $to::fromCast($what);
+    }
+
+    return new $to($what);
+}
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Use type hints for better IDE support">
+    Define typed properties in your castable classes so your IDE can provide autocomplete:
+    
+    ```php
+    class Note implements Castable
+    {
+        public function __construct(
+            public string $to,
+            public string $from,
+            public ?string $heading = null
+        ) {}
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle missing data gracefully">
+    XML elements may not always have all expected fields. Provide defaults:
+    
+    ```php
+    public static function fromCast(array $data): Castable
+    {
+        return new self(
+            $data['to'] ?? 'Unknown',
+            $data['from'] ?? 'Unknown',
+            $data['heading'] ?? null
+        );
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Choose the right casting approach">
+    - Use **Eloquent models** when you plan to save data to the database
+    - Use **Castable interface** for value objects and custom business logic
+    - Use **default classes** for simple data containers
+  </Accordion>
+</AccordionGroup>
+
+## Related topics
+
+<CardGroup cols={2}>
+  <Card title="Custom transformers" icon="code" href="/advanced/custom-transformers">
+    Learn how to transform XML data with custom transformer classes
+  </Card>
+  
+  <Card title="Importing XML" icon="file-import" href="/importing">
+    Learn the basics of importing XML files
+  </Card>
+</CardGroup>

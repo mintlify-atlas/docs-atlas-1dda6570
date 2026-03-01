@@ -1,0 +1,256 @@
+---
+title: Casting XML data
+description: Cast XML elements to PHP classes and Laravel Eloquent models
+---
+
+Casting allows you to transform XML elements into instances of your PHP classes or Laravel Eloquent models, making it easier to work with type-safe objects.
+
+## Basic casting
+
+Cast XML elements to a class using the `cast()` method:
+
+```php
+use Flowgistics\XML\XML;
+
+class Note
+{
+    public function __construct($data)
+    {
+        // Initialize from array
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// $xml->note is now a Note instance
+```
+
+## Casting to Eloquent models
+
+Cast XML elements directly to Laravel Eloquent models:
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Flowgistics\XML\XML;
+
+class Note extends Model
+{
+    protected $fillable = [
+        'to',
+        'from',
+        'heading',
+        'body',
+        'completed_at',
+    ];
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// $xml->note is now a Note model instance
+// You can use all Eloquent methods
+$xml->note->save();
+```
+
+<Note>
+When casting to Eloquent models, the XML data is passed to the model's constructor as an array, using the model's `$fillable` properties.
+</Note>
+
+## Using the Castable interface
+
+For more control over the casting process, implement the `Castable` interface:
+
+```php
+use Flowgistics\XML\Casts\Castable;
+
+class TextNote implements Castable
+{
+    public function __construct(
+        public string $to,
+        public string $from,
+        public string $text
+    ) {}
+
+    public static function fromCast(array $data): Castable
+    {
+        return new TextNote(
+            $data['to'],
+            $data['from'],
+            $data['body']
+        );
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(TextNote::class)
+    ->get();
+
+// $xml->note is now a TextNote instance
+```
+
+The `Castable` interface requires a single static method:
+
+- `fromCast(array $data): Castable` - Receives the XML element data as an array and returns an instance of the class
+
+## Casting arrays of elements
+
+When an XML element contains multiple items, the cast is automatically applied to each item:
+
+```xml
+<notes>
+    <note completed="true">
+        <to>Foo</to>
+        <from>Bar</from>
+    </note>
+    <note completed="false">
+        <to>John</to>
+        <from>Jane</from>
+    </note>
+</notes>
+```
+
+```php
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// $xml->note is now an array of Note instances
+foreach ($xml->note as $note) {
+    echo $note->to; // Each item is a Note instance
+}
+```
+
+## Multiple casts
+
+Apply different casts to different elements:
+
+```php
+$xml = XML::import('data.xml')
+    ->cast('note')->to(Note::class)
+    ->cast('user')->to(User::class)
+    ->cast('comment')->to(Comment::class)
+    ->get();
+```
+
+## How casting works
+
+The casting system uses the `Cast` class, which handles three types of casts:
+
+1. **Eloquent Models** - Passes the data array to the model constructor
+2. **Castable Classes** - Calls the `fromCast()` static method
+3. **Default Classes** - Passes the data array to the class constructor
+
+Here's the casting logic from the source code (src/Casts/Cast.php:19):
+
+```php
+public static function to(array $what, $to): mixed
+{
+    $interfaces = class_implements($to);
+    
+    if ($to instanceof Model) {
+        return new ($to::class)($what);
+    }
+
+    if ($to instanceof Castable || isset($interfaces[Castable::class])) {
+        return $to::fromCast($what);
+    }
+
+    return new $to($what);
+}
+```
+
+## Practical example
+
+Here's a complete example combining imports, casts, and model usage:
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Flowgistics\XML\XML;
+
+class Note extends Model
+{
+    protected $fillable = [
+        'to',
+        'from',
+        'heading',
+        'body',
+        'completed_at',
+    ];
+
+    protected $casts = [
+        'completed_at' => 'datetime',
+    ];
+}
+
+// Import and cast XML to models
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(Note::class)
+    ->get();
+
+// Save to database
+foreach ($xml->note as $note) {
+    $note->save();
+}
+```
+
+## Custom constructor casting
+
+For classes with custom constructors:
+
+```php
+class MyNote
+{
+    public function __construct($data)
+    {
+        $this->to = $data['to'] ?? null;
+        $this->from = $data['from'] ?? null;
+        $this->body = $data['body'] ?? null;
+    }
+}
+
+$xml = XML::import('notes.xml')
+    ->cast('note')->to(MyNote::class)
+    ->get();
+```
+
+## Combining with transformers
+
+You can combine casts with transformers for powerful data processing:
+
+```php
+$xml = XML::import('notes.xml')
+    ->expect('note')->as('array')  // Ensure it's an array
+    ->cast('note')->to(Note::class) // Cast each to Note
+    ->get();
+```
+
+## Type safety benefits
+
+Casting provides several benefits:
+
+- **Type hints** - Use type hints in your code
+- **IDE support** - Better autocomplete and code intelligence
+- **Validation** - Validate data in the `fromCast()` method
+- **Transformation** - Transform data during casting
+- **Eloquent features** - Access relationships, scopes, and other Eloquent features
+
+<Warning>
+Make sure the XML structure matches the expected properties of your class. Missing keys will result in `null` values or errors depending on your class implementation.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Transformers" icon="arrows-rotate" href="/transformers">
+    Transform XML data before casting
+  </Card>
+  <Card title="Importing" icon="file-import" href="/importing">
+    Learn more about importing XML
+  </Card>
+  <Card title="Optimization" icon="gauge-high" href="/optimization">
+    Optimize key naming conventions
+  </Card>
+</CardGroup>

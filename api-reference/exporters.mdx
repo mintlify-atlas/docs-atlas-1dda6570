@@ -1,0 +1,371 @@
+---
+title: 'Exporters'
+description: 'Complete API reference for ArrayExporter and ViewExporter classes'
+---
+
+Exporters provide functionality to convert data into XML format. The package includes two exporters: `ArrayExporter` for converting arrays and `ViewExporter` for rendering Blade views.
+
+## ArrayExporter
+
+The `ArrayExporter` class converts PHP arrays to XML documents. It extends `XMLBuilder` and implements the `Exporter` interface.
+
+### Constructor
+
+```php
+new ArrayExporter(array $data)
+```
+
+<ParamField path="data" type="array" required>
+  The array data to export as XML.
+</ParamField>
+
+```php
+use Flowgistics\XML\Exporters\ArrayExporter;
+
+$exporter = new ArrayExporter([
+    'users' => [
+        ['name' => 'John', 'email' => 'john@example.com'],
+        ['name' => 'Jane', 'email' => 'jane@example.com']
+    ]
+]);
+```
+
+<Note>
+  Prefer using `XML::export($data)` instead of instantiating directly.
+</Note>
+
+### usePrettyOutput()
+
+Enable formatted (pretty-printed) XML output.
+
+```php
+public function usePrettyOutput(): self
+```
+
+<ResponseField name="return" type="self">
+  Returns the exporter instance for chaining.
+</ResponseField>
+
+```php
+$xml = XML::export($data)
+    ->usePrettyOutput()
+    ->toString();
+```
+
+#### Example Output
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <user>
+    <name>John</name>
+    <email>john@example.com</email>
+  </user>
+  <user>
+    <name>Jane</name>
+    <email>jane@example.com</email>
+  </user>
+</root>
+```
+
+### toString()
+
+Convert the array to an XML string.
+
+```php
+public function toString(?bool $prettyOutput = null): string
+```
+
+<ParamField path="prettyOutput" type="bool|null" default="null">
+  When true, formats the XML with indentation. Overrides `usePrettyOutput()` if specified.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Returns the XML string.
+</ResponseField>
+
+```php
+// Basic usage
+$xml = XML::export($data)->toString();
+
+// With pretty output parameter
+$xml = XML::export($data)->toString(true);
+
+// Using method chaining
+$xml = XML::export($data)
+    ->usePrettyOutput()
+    ->toString();
+```
+
+### toFile()
+
+Save the XML to a file.
+
+```php
+public function toFile(string $path): void
+```
+
+<ParamField path="path" type="string" required>
+  The file path where the XML should be saved.
+</ParamField>
+
+```php
+XML::export($data)
+    ->usePrettyOutput()
+    ->toFile(storage_path('exports/data.xml'));
+```
+
+<Info>
+  The file will be created if it doesn't exist. Existing files will be overwritten.
+</Info>
+
+### Complete ArrayExporter Example
+
+```php
+use Flowgistics\XML\Facades\XML;
+
+$users = [
+    'users' => [
+        [
+            'id' => 1,
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'role' => 'admin'
+        ],
+        [
+            'id' => 2,
+            'name' => 'Jane Smith',
+            'email' => 'jane@example.com',
+            'role' => 'user'
+        ]
+    ]
+];
+
+// Export with custom configuration
+$xml = XML::export($users)
+    ->version('1.0')
+    ->encoding('UTF-8')
+    ->rootTag('data')
+    ->itemName('user')
+    ->usePrettyOutput()
+    ->toString();
+
+// Save to file
+XML::export($users)
+    ->rootTag('users')
+    ->itemName('user')
+    ->usePrettyOutput()
+    ->toFile('output.xml');
+```
+
+---
+
+## ViewExporter
+
+The `ViewExporter` class renders Laravel Blade views as XML documents. It extends `XMLBuilder` and implements the `Exporter` interface.
+
+### Constructor
+
+```php
+new ViewExporter(string $viewName, array $data = [])
+```
+
+<ParamField path="viewName" type="string" required>
+  The name of the Blade view to render.
+</ParamField>
+
+<ParamField path="data" type="array" default="[]">
+  Data to pass to the view.
+</ParamField>
+
+```php
+use Flowgistics\XML\Exporters\ViewExporter;
+
+$exporter = new ViewExporter('xml.products', [
+    'products' => $products
+]);
+```
+
+<Note>
+  Prefer using `XML::exportView($viewName, $data)` instead of instantiating directly.
+</Note>
+
+### toString()
+
+Render the view and return as an XML string.
+
+```php
+public function toString(): string
+```
+
+<ResponseField name="return" type="string">
+  Returns the complete XML string with prolog and root tags.
+</ResponseField>
+
+```php
+$xml = XML::exportView('xml.report', ['data' => $reportData])
+    ->toString();
+```
+
+### toFile()
+
+Render the view and save to a file.
+
+```php
+public function toFile(string $path): void
+```
+
+<ParamField path="path" type="string" required>
+  The file path where the XML should be saved.
+</ParamField>
+
+```php
+XML::exportView('xml.invoice', ['invoice' => $invoice])
+    ->toFile(storage_path('invoices/invoice-' . $invoice->id . '.xml'));
+```
+
+### Complete ViewExporter Example
+
+#### Controller
+
+```php
+use Flowgistics\XML\Facades\XML;
+use App\Models\Product;
+
+class ProductExportController extends Controller
+{
+    public function export()
+    {
+        $products = Product::all();
+        
+        return response()
+            ->make(
+                XML::exportView('xml.products', compact('products'))
+                    ->rootTag('catalog')
+                    ->toString(),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
+    }
+    
+    public function exportToFile()
+    {
+        $products = Product::all();
+        
+        XML::exportView('xml.products', compact('products'))
+            ->rootTag('catalog')
+            ->toFile(storage_path('exports/products.xml'));
+            
+        return response()->download(storage_path('exports/products.xml'));
+    }
+}
+```
+
+#### Blade View (resources/views/xml/products.blade.php)
+
+```blade
+@foreach($products as $product)
+<product id="{{ $product->id }}">
+    <name>{{ $product->name }}</name>
+    <description>{{ $product->description }}</description>
+    <price currency="USD">{{ $product->price }}</price>
+    <stock>{{ $product->stock }}</stock>
+    @if($product->categories->count())
+    <categories>
+        @foreach($product->categories as $category)
+        <category>{{ $category->name }}</category>
+        @endforeach
+    </categories>
+    @endif
+</product>
+@endforeach
+```
+
+#### Generated XML Output
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+<product id="1">
+    <name>Laptop</name>
+    <description>High-performance laptop</description>
+    <price currency="USD">999.99</price>
+    <stock>50</stock>
+    <categories>
+        <category>Electronics</category>
+        <category>Computers</category>
+    </categories>
+</product>
+<product id="2">
+    <name>Mouse</name>
+    <description>Wireless mouse</description>
+    <price currency="USD">29.99</price>
+    <stock>200</stock>
+    <categories>
+        <category>Electronics</category>
+        <category>Accessories</category>
+    </categories>
+</product>
+</catalog>
+```
+
+---
+
+## Exporter Interface
+
+Both exporters implement the `Exporter` interface with the following methods:
+
+```php
+interface Exporter
+{
+    public function toString(): string;
+    public function toFile(string $path): void;
+}
+```
+
+---
+
+## Inherited Methods
+
+Both exporters extend `XMLBuilder`, so they inherit all configuration methods:
+
+- `version(string $version)` - Set XML version
+- `encoding(string $encoding)` - Set character encoding
+- `rootTag(string $name)` - Set root tag name
+- `itemName(string $name)` - Set default item name
+- `disableRootTag()` - Disable root tag wrapper
+- `forceItemName()` - Force item name usage
+
+See the [XMLBuilder documentation](/api-reference/xml-builder) for details.
+
+---
+
+## Comparison
+
+| Feature | ArrayExporter | ViewExporter |
+|---------|--------------|-------------|
+| Input | PHP Array | Blade View |
+| Pretty Output | `usePrettyOutput()` | Manual formatting in view |
+| Dynamic Content | Limited | Full Blade features |
+| Complexity | Simple arrays | Complex structures |
+| Best For | API responses, simple exports | Reports, invoices, complex layouts |
+
+---
+
+## Best Practices
+
+<Note>
+  **Choose the right exporter:**
+  - Use `ArrayExporter` for simple, structured data
+  - Use `ViewExporter` for complex layouts or when you need Blade's templating features
+</Note>
+
+<Warning>
+  **XML Validation:**
+  Neither exporter validates the resulting XML. Ensure your data or views produce valid XML structure.
+</Warning>
+
+<Info>
+  **Performance:**
+  For large datasets, `ArrayExporter` is generally faster. For complex formatting, `ViewExporter` provides better maintainability.
+</Info>
