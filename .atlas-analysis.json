@@ -1,0 +1,85 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Laravel XML",
+  "projectDescription": "A Laravel package for easily importing and exporting XML data with casting, transformers, and view support",
+  "theme": "palm",
+  "primaryColor": "#FF2D20",
+  "lightColor": "#FF6B59",
+  "darkColor": "#C91E0E",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "importing",
+          "exporting",
+          "casts",
+          "transformers",
+          "optimization"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/xml-facade",
+          "api-reference/xml-collection",
+          "api-reference/xml-builder",
+          "api-reference/exporters",
+          "api-reference/data-classes"
+        ]
+      },
+      {
+        "group": "Advanced",
+        "pages": [
+          "advanced/custom-casts",
+          "advanced/custom-transformers",
+          "advanced/view-exports"
+        ]
+      },
+      {
+        "group": "Resources",
+        "pages": [
+          "examples",
+          "changelog",
+          "contributing"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Fast XML importing with casting to classes and Eloquent models",
+    "XML exporting from nested arrays with automatic tag generation",
+    "Export Laravel Blade views directly to XML format",
+    "Built-in transformers for data manipulation",
+    "Optimization options for camelCase and underscore naming conventions",
+    "Support for attributes and nested XML structures"
+  ],
+  "publicApiSurface": [
+    "XML::import(string $path, bool $raw = false)",
+    "XML::export(array $data)",
+    "XML::exportView(string $viewName, array $data = [])",
+    "XMLCollection::cast(string $key)",
+    "XMLCollection::transform(string $key)",
+    "XMLCollection::expect(string $key)",
+    "XMLCollection::optimize(string $type)",
+    "XMLCollection::get()",
+    "XMLCollection::raw()",
+    "XMLBuilder::version(string $version)",
+    "XMLBuilder::encoding(string $encoding)",
+    "XMLBuilder::rootTag(string $name)",
+    "XMLBuilder::itemName(string $name)",
+    "ArrayExporter::toString()",
+    "ArrayExporter::toFile(string $path)",
+    "ArrayExporter::usePrettyOutput()",
+    "ViewExporter::toString()",
+    "ViewExporter::toFile(string $path)"
+  ]
+}
