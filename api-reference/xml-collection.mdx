@@ -70,7 +70,7 @@ public function get(): XMLObject|array
 </ResponseField>
 
 ```php
-$data = $xml->transform('users')->using('App\Transformers\UserTransformer')
+$data = $xml->transform('users')->with('App\Transformers\UserTransformer')
     ->get();
 ```
 
@@ -148,12 +148,12 @@ public function transform(string $key): PendingTransform
 
 ```php
 $xml->transform('users')
-    ->using('App\Transformers\UserTransformer')
+    ->with('App\Transformers\UserTransformer')
     ->get();
 
 // Using callable
 $xml->transform('price')
-    ->using(fn($value) => (float) $value)
+    ->with(fn($value) => (float) $value)
     ->get();
 ```
 
@@ -175,7 +175,7 @@ public function expect(string $key): PendingTransform
 
 ```php
 $xml->expect('users')
-    ->using('App\Transformers\UserTransformer');
+    ->with('App\Transformers\UserTransformer');
 ```
 
 ### cast()
@@ -399,7 +399,7 @@ use App\Models\User;
 $xml = XML::import('users.xml')
     ->optimize(XML::OPTIMIZE_UNDERSCORE)
     ->transform('users')
-    ->using(UserTransformer::class)
+    ->with(UserTransformer::class)
     ->cast('created_at')
     ->to('datetime');
 
